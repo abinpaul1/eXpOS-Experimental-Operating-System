@@ -29,6 +29,17 @@ loadi(83, 69);
 loadi(50,63);
 loadi(51,64);
 
+//MOD 0 loading
+loadi(40,53);
+loadi(41,54);
+
+//MOD 4 loading
+loadi(48,61);
+loadi(49,62);
+
+//Setting terminal as free
+[TERMINAL_STATUS_TABLE]=0;
+
 //Setting PTBR for pid = 1, init process
 PTBR = PAGE_TABLE_BASE+20;
 PTLR = 10;

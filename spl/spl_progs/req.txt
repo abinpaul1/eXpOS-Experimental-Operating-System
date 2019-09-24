@@ -1,0 +1,11 @@
+# load --os ../spl/spl_progs/stage_14/os_startup_final.xsm
+# load --int=timer ../spl/spl_progs/stage_14/sample_timer.xsm
+# load --module 5 ../spl/spl_progs/stage_14/mod_5.xsm
+# load --int=10 ../spl/spl_progs/stage_14/int10.xsm
+# load --module 7 ../spl/spl_progs/stage_14/boot_module.xsm
+# load --library ../expl/library.lib
+# load --int=7 ../spl/spl_progs/stage_14/sample_int7_stage14.xsm
+# load --init ../spl/spl_progs/stage_14/expl_progs/num_odd.xsm
+# load --idle ../spl/spl_progs/stage_14/expl_progs/idle_prog.xsm
+# load --exec ../spl/spl_progs/stage_14/expl_progs/num_even.xsm
+

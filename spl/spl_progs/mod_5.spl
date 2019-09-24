@@ -52,6 +52,7 @@ if ([new_process_table + 4] == CREATED) then
     [new_process_table + 4] = RUNNING;
     // Mode flag to 0
     [new_process_table + 9] = 0;
+    //scheduler directly starts execution in user mode
     ireturn;
 endif;
 
