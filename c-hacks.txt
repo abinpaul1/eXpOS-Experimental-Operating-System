@@ -1,0 +1,3 @@
+printf returns the number of characters successfully written on output
+
+FORK()- duplicats a process -- tree-like-spawning -address of memory returned by malloc is same but in actual they are pointing to or mapped to different physical address

@@ -1,0 +1,99 @@
+//Mode flag = -1 --- in exception handler
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = -1;
+
+//Saving SP to UPTR
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1]*16 ) + 13] = SP;
+
+alias userSP R0;
+
+// Setting SP to beginning of kernel stack --  User Area Page number*512  - 1
+SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1]*16 ) + 11]*512 - 1;
+backup;
+multipush(EIP);
+
+
+if ((EC != 0) || (userSP == (PTLR*512-1))) then
+  if (userSP == PTLR*512-1) then
+    print "Full US";
+  endif;
+  if (EC == 1) then
+    print "Ill. Inst";
+  endif;
+  if (EC == 2) then
+    print "Ill Mem Ac";
+  endif;
+  if (EC == 3) then
+    print "Arith. Ex.";
+  endif;
+
+  multipush(R0,EC,EPN,EMA,EIP);
+  //Calling Exit Process
+  R1 = 3;
+  R2 = [SYSTEM_STATUS_TABLE+1];
+  call MOD_1;
+  multipop(R0,EC,EPN,EMA,EIP);
+
+  // Calling scheduler
+  multipush(R0,EC,EPN,EMA,EIP);
+  //Calling switch_context
+  call MOD_5;
+  multipop(R0,EC,EPN,EMA,EIP);
+endif;
+
+if ( (EPN==2) || (EPN==3)) then
+  alias pageNum1 R5;
+  alias pageNum2 R6;
+  // Getting free page for heap
+  multipush(R0,EC,EPN,EMA,EIP);
+  R1 = 1;
+  call MOD_2;
+  pageNum1 = R0;
+  multipop(R0,EC,EPN,EMA,EIP);
+
+  multipush(R0, R5,EC,EPN,EMA,EIP);
+  R1 = 1;
+  call MOD_2;
+  pageNum2 = R0;
+  multipop(R0, R5,EC,EPN,EMA,EIP);
+
+  //Updating page table
+  [PTBR + 4] = pageNum1;
+  [PTBR + 5] = "1110";
+  [PTBR + 6] = pageNum2;
+  [PTBR + 7] = "1110";
+endif;
+
+
+//If page corresponds to code page
+if( (EPN >= 4) && (EPN<=7) ) then
+  alias diskBlockNum R1;
+  alias pageNum R5;
+  diskBlockNum = [DISK_MAP_TABLE + [SYSTEM_STATUS_TABLE + 1]*10 + EPN];
+  //Calling Get code page
+  multipush(R0, R1,EC,EPN,EMA,EIP);
+  R2 = diskBlockNum;
+  R1=5;
+  R3 = [SYSTEM_STATUS_TABLE + 1];
+  call MOD_2;
+  pageNum = R0;
+  multipop(R0, R1,EC,EPN,EMA,EIP);
+
+  //Updating page table entry
+  [PTBR + EPN*2] = pageNum';
+  [PTBR + EPN*2 + 1] = "1100";
+endif;
+
+
+multipop(EIP);
+restore;
+//Resetting mode flag
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+
+SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1]*16 ) + 13];
+
+SP = SP + 1;
+//adress translation since SP has logical address
+[ [PTBR + 2*(SP/512)] * 512 + (SP % 512)] = EIP;
+
+
+ireturn;

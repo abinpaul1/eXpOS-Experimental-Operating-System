@@ -1,0 +1,52 @@
+//Mode field is set to 5 in process table
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 5;
+
+alias userSP R0;
+userSP = SP;
+
+// SP value is stored in UPTR field of process table
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] = SP;
+
+// Changing to kernel stack
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11]*512 - 1;
+
+
+alias physicalPageNum R1;
+alias offset R2;
+alias fileDescPhysicalAddr R3;
+// userSP - 4 contains argument 1 ie, logical address of filedesc
+// Finding physical address
+physicalPageNum = [PTBR + 2*( (userSP - 4)/512 )];
+offset = (userSP - 4)%512;
+fileDescPhysicalAddr = physicalPageNum*512 + offset;
+alias fileDesc R4;
+fileDesc = [fileDescPhysicalAddr];
+if (fileDesc!= -2)
+then
+    //userSP -1 stores logical adress of return value
+    alias physicalAddrOfRetVal R5;
+    physicalAddrOfRetVal = [PTBR + 2* ((userSP-1)/512)]*512 + ((userSP-1)%512);
+    [physicalAddrOfRetVal] = -1;
+else
+    // userSP - 3 contains argument 2 -- word to be dispalyed -- logical address
+    alias word R5;
+    word = [[PTBR + 2* ((userSP-3)/512)]*512 + ((userSP-3)%512)];
+
+    multipush(R0, R1, R2, R3, R4, R5);
+    //R1- function call number of terminal write
+    //R0 will have return value after call
+    R1 = 3;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = word;
+    call MOD_4;
+    multipop(R0, R1, R2, R3, R4, R5);
+
+    alias physicalAddrOfRetVal R6;
+    physicalAddrOfRetVal = [PTBR + 2* ((userSP-1)/512)]*512 + ((userSP-1)%512);
+    [physicalAddrOfRetVal] = 0;
+endif;
+
+SP = userSP;
+// Mode field to 0
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+ireturn;
