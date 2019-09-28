@@ -1,0 +1,52 @@
+//Setting mode flag of curent process
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 7;
+
+// Saving value of user stack
+alias userSP R0;
+userSP=SP;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 - 1;
+
+alias physicalPageNum R1;
+alias offset R2;
+alias fileDescPhysicalAddr R3;
+// userSP - 4 contains argument 1 ie, logical address of filedesc
+// Finding physical address
+physicalPageNum = [PTBR + 2*( (userSP - 4)/512 )];
+offset = (userSP - 4)%512;
+fileDescPhysicalAddr = physicalPageNum*512 + offset;
+alias fileDesc R4;
+fileDesc = [fileDescPhysicalAddr];
+
+if (fileDesc!=-1) then
+  //userSP -1 stores logical adress of return value
+  alias physicalAddrOfRetVal R5;
+  physicalAddrOfRetVal = [PTBR + 2* ((userSP-1)/512)]*512 + ((userSP-1)%512);
+  [physicalAddrOfRetVal] = -1;
+else
+  // userSP - 3 contains argument 2 -- logical address of variable to be read into
+  alias input_word R5;
+  input_word = [[PTBR + 2* ((userSP-3)/512)]*512 + ((userSP-3)%512)];
+
+  multipush(R0, R1, R2, R3, R4, R5);
+  //R1- function call number of terminal read
+  //R0 will have return value after call
+  R1 = 4;
+  R2 = [SYSTEM_STATUS_TABLE + 1];
+  R3 = input_word;
+  call MOD_4;
+  multipop(R0, R1, R2, R3, R4, R5);
+  
+  //Setting 0--success as return value
+  alias physicalAddrOfRetVal R6;
+  physicalAddrOfRetVal = [PTBR + 2* ((userSP-1)/512)]*512 + ((userSP-1)%512);
+  [physicalAddrOfRetVal] = 0;
+
+endif;
+
+//Mode flag to 0
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+//SP to user stack
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+ireturn;

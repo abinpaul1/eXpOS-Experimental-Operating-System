@@ -1,0 +1,19 @@
+int main()
+{
+decl
+  int temp,a,b,num;
+enddecl
+begin
+  temp = exposcall("Read",-1,a);
+  temp = exposcall("Read",-1,b);
+  while(a!=b) do
+    if (a>b) then
+      a = a - b;
+    else
+      b = b - a;
+    endif;
+  endwhile;
+  temp = exposcall("Write",-2,a);
+  return 0;
+end
+}

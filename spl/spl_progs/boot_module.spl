@@ -22,9 +22,6 @@ loadi(3, 16);
 loadi(4, 17);
 loadi(5, 18);
 
-// Even program loading
-loadi(83, 69);
-
 //MOD 5 loading
 loadi(50,63);
 loadi(51,64);
@@ -36,6 +33,14 @@ loadi(41,54);
 //MOD 4 loading
 loadi(48,61);
 loadi(49,62);
+
+//Console interrupt loading
+loadi(8,21);
+loadi(9,22);
+
+//INT 6 loading
+loadi(14,27);
+loadi(15,28);
 
 //Setting terminal as free
 [TERMINAL_STATUS_TABLE]=0;
@@ -94,62 +99,10 @@ PROC_TAB = PROCESS_TABLE + 16;
 [76*512] = [65*512 + 1];
 
 
-//Setting PTBR for pid = 2, even program process
-PTBR = PAGE_TABLE_BASE+40;
-PTLR = 10;
-
-// Shared Library
-[PTBR+0] = 63;
-[PTBR+1] = "0100";
-[PTBR+2] = 64;
-[PTBR+3] = "0100";
-
-//Heap
-[PTBR+4] = 86;
-[PTBR+5] = "0110";
-[PTBR+6] = 87;
-[PTBR+7] = "0110";
-
-//Code
-[PTBR+8] = 83;
-[PTBR+9] = "0100";
-[PTBR+10] = -1;
-[PTBR+11] = "0000";
-[PTBR+12] = -1;
-[PTBR+13] = "0000";
-[PTBR+14] = -1;
-[PTBR+15] = "0000";
-
-//Stack
-[PTBR+16] = 84;
-[PTBR+17] = "0110";
-[PTBR+18] = 85;
-[PTBR+19] = "0110";
-
-
-PROC_TAB = PROCESS_TABLE + 32;
-// Process table entry for even program
-//pid = 2
-[PROC_TAB + 1] = 2;
-//Assigning UArea page number
-[PROC_TAB + 11] = 88;
-//State is CREATED
-[PROC_TAB + 4] = CREATED;
-//Setting UPTR to stack logical address
-[PROC_TAB + 13] = 8*512;
-//Setting KPTR to 0
-[PROC_TAB + 12] = 0;
-//Setting PTBR
-[PROC_TAB + 14] = PAGE_TABLE_BASE + 40;
-//Setting PTLR
-[PROC_TAB + 15] = 10;
-//Stack pointer to entry point in code header
-[84*512] = [83*512 + 1];
-
 
 //Setting all other process state as TERMINATED
 alias iter R2;
-iter = 3;
+iter = 2;
 while (iter<=15) do
   [PROCESS_TABLE + iter*16 + 4] = TERMINATED;
   iter = iter + 1;
