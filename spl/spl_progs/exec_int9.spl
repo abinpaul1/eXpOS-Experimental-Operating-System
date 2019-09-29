@@ -1,0 +1,182 @@
+//Setting mode flag to sys call number
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 9;
+
+// Saving value of user stack
+alias userSP R0;
+userSP=SP;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 - 1;
+
+
+alias fileName R1;
+//Getting fileName from argument userSP-2
+fileName = [[PTBR + 2* ( (userSP-2)/512 )]*512 + ((userSP-2)%512)];
+
+alias inode_index R2;
+inode_index = -1;
+
+//Finding inode index of file
+alias iter R3;
+iter = 1;
+while (iter<=15) do
+  if ( ([(INODE_TABLE + iter*16)] == EXEC) && ([(INODE_TABLE + iter*16) + 1] == fileName) ) then
+    inode_index = iter;
+    break;
+  endif;
+  iter = iter + 1;
+endwhile;
+
+//If file not found
+if (inode_index==-1) then
+  //Return value : -1
+  [[PTBR + 2* ( (userSP-1)/512 )]*512 + ((userSP-1)%512)] = -1;
+  //Setting back SP, Mode flag
+  [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+  SP = userSP;
+  ireturn;
+endif;
+
+
+//Calling Exit Process in process manager module (mod_1)
+multipush(R0, R1, R2, R3);
+//R1- function call number of exit process
+//R0 will have return value after call
+R1 = 3;
+R2 = [SYSTEM_STATUS_TABLE + 1];
+
+call MOD_1;
+multipop(R0, R1, R2, R3);
+
+
+
+//Reclaiming the deallocated page
+
+//Incrementing memory free list entry of user page area
+alias user_area_page_num R4;
+alias addrMemFreeListEntry R5;
+user_area_page_num = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11];
+addrMemFreeListEntry = MEMORY_FREE_LIST + user_area_page_num;
+[addrMemFreeListEntry] = [addrMemFreeListEntry] + 1;
+//Decrementing MEM_FREE_COUNT field in system status table
+[SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
+
+//Setting SP to initialize the kernel stack
+SP = user_area_page_num*512 - 1;
+//Updating state to running
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 4] = RUNNING;
+//Storing the inode index
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 7] = inode_index;
+
+//Setting Page table entries
+// Shared Library
+[PTBR+0] = 63;
+[PTBR+1] = "0100";
+[PTBR+2] = 64;
+[PTBR+3] = "0100";
+
+//Free page number returned by function is always stored in R6
+alias free_page R6;
+
+
+//Heap
+
+multipush(R0, R1, R2, R3, R4, R5);
+// Function number of get free page in memory manager -- 1
+R1 = 1;
+call MOD_2;
+free_page = R0;
+multipop(R0, R1, R2, R3, R4, R5);
+[PTBR+4] = free_page;
+[PTBR+5] = "0110";
+
+multipush(R0, R1, R2, R3, R4, R5);
+// Function number of get free page in memory manager -- 1
+R1 = 1;
+call MOD_2;
+free_page = R0;
+multipop(R0, R1, R2, R3, R4, R5);
+[PTBR+6] = free_page;
+[PTBR+7] = "0110";
+
+
+
+//Stack
+
+multipush(R0, R1, R2, R3, R4, R5);
+// Function number of get free page in memory manager -- 1
+R1 = 1;
+call MOD_2;
+free_page = R0;
+multipop(R0, R1, R2, R3, R4, R5);
+[PTBR+16] = free_page;
+[PTBR+17] = "0110";
+
+multipush(R0, R1, R2, R3, R4, R5);
+// Function number of get free page in memory manager -- 1
+R1 = 1;
+call MOD_2;
+free_page = R0;
+multipop(R0, R1, R2, R3, R4, R5);
+[PTBR+18] = free_page;
+[PTBR+19] = "0110";
+
+
+// Getting count of no. of code pages
+alias count R7;
+count = 0;
+iter = 0;
+while(iter<4) do
+  if ([INODE_TABLE + inode_index*16 + 8 + iter]!=-1) then
+    count = count + 1;
+  endif;
+  iter = iter + 1;
+endwhile;
+
+
+//Allocating memory pages for the code
+iter = 0;
+alias count_iter R8;
+count_iter = count;
+
+while(count_iter>0) do
+  multipush(R0, R1, R2, R3, R4, R5, R7, R8);
+  R1 = 1;
+  call MOD_2;
+  free_page = R0;
+  multipop(R0, R1, R2, R3, R4, R5, R7, R8);
+  [PTBR + 8 + 2*iter] = free_page;
+  [PTBR + 8 + 2*iter + 1] = "0100";
+  iter = iter + 1;
+  count_iter = count_iter - 1;
+endwhile;
+
+//Setting remaining code pages to invalid
+while(iter<4) do
+  [PTBR + 8 + 2*iter] = -1;
+  [PTBR + 8 + 2*iter + 1] = "0000";
+  iter = iter + 1;
+endwhile;
+
+alias disk_block R9;
+alias mem_block R10;
+//Loading code from disk to memory
+count_iter = count;
+iter = 0;
+while(count_iter>0) do
+  disk_block = [INODE_TABLE + inode_index*16 + 8 + iter];
+  mem_block = [PTBR + 8 + 2*iter];
+  loadi(mem_block, disk_block);
+  iter = iter + 1;
+  count_iter = count_iter - 1;
+endwhile;
+
+//Entry point value to user stack top
+[[PTBR + 16]*512] = [[PTBR + 8]*512 + 1];
+//Change SP to user stack
+SP = 8*512;
+
+//Setting mode flag back to 0
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+
+ireturn;

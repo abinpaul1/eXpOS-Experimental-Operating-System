@@ -1,0 +1,60 @@
+//Free User Area Page-2 , Exit Process-3 , Free Page Table-4
+
+alias functionNum R1;
+alias currentPID R2;
+
+///Free User Area Page
+if (functionNum==2) then
+  //Invoking Release page
+  multipush(R0, R1, R2);
+  R1 = 2;
+  R2 = [PROCESS_TABLE + currentPID*16 + 11];
+  call  MOD_2;
+  multipop(R0, R1, R2);
+  return;
+endif;
+
+//Exit Process
+if (functionNum==3) then
+  //Invoking free Page Table
+  multipush(R0, R1, R2);
+  R1 = 4;
+  R2 = currentPID;
+  call  MOD_1;
+  multipop(R0, R1, R2);
+
+  //Invoking free user area page
+  multipush(R0, R1, R2);
+  R1 = 2;
+  R2 = currentPID;
+  call  MOD_1;
+  multipop(R0, R1, R2);
+
+  //Setting state as TERMINATED
+  [PROCESS_TABLE + currentPID*16 +4] = TERMINATED;
+  return;
+endif;
+
+if (functionNum==4) then
+  //Invalidating library pages
+  [PAGE_TABLE_BASE + currentPID*20 +0] = -1;
+  [PAGE_TABLE_BASE + currentPID*20 +1] = "0000";
+  [PAGE_TABLE_BASE + currentPID*20 +2] = -1;
+  [PAGE_TABLE_BASE + currentPID*20 +3] = "0000";
+
+  alias iter R3;
+  iter = 2;
+  while(iter<10) do
+    //Invoking Release Page if page is valid
+    if ([PAGE_TABLE_BASE + currentPID*20 + 2*iter + 1]!= "0000") then
+      multipush(R0, R1, R2, R3);
+      R1 = 2;
+      R2 = [PAGE_TABLE_BASE + currentPID*20 + 2*iter];
+      call  MOD_2;
+      multipop(R0, R1, R2, R3);
+      [PAGE_TABLE_BASE + currentPID*20 + 2*iter + 1] = "0000";
+    endif;
+    iter = iter+1;
+  endwhile;
+  return;
+endif;

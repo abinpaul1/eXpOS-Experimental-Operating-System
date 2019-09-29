@@ -1,0 +1,65 @@
+//Get free Page-1 , Release Page Table-2
+
+alias functionNum R1;
+
+//Get free page
+if (functionNum == 1) then
+  alias currentPID R2;
+  currentPID = [SYSTEM_STATUS_TABLE + 1];
+  //Incrementing WAIT_MEM_COUNT
+  [SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] + 1;
+
+  //While memory is full -- MEM_FREE_COUNT = 0
+  while ([SYSTEM_STATUS_TABLE + 2]==0) do
+    [PROCESS_TABLE + currentPID*16 + 4]=WAIT_MEM;
+    //Scheduling other process
+    call MOD_5;
+  endwhile;
+
+  //Decrementing WAIT_MEM_COUNT
+  [SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] - 1;
+
+  //Decrementing MEM_FREE_COUNT
+  [SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
+
+  //Finding free page in memory free list
+  alias iter R3;
+  iter = 76;
+  while(iter<128) do
+    if ( [MEMORY_FREE_LIST + iter] == 0) then
+      break;
+    endif;
+    iter = iter + 1;
+  endwhile;
+  //Setting entry to 1 and returning the page number
+  [MEMORY_FREE_LIST + iter] = 1;
+  R0 = iter;
+  return;
+endif;
+
+
+//Release page
+if (functionNum == 2) then
+  alias pageNumToRelease R2;
+  //Decrease entry in MEMORY_FREE_LIST
+  [MEMORY_FREE_LIST + pageNumToRelease] = [MEMORY_FREE_LIST + pageNumToRelease] - 1;
+  // Checking if page is free (mem free list entry = 0)
+  if ([MEMORY_FREE_LIST + pageNumToRelease] == 0) then
+    //Incrementing MEM_FREE_COUNT
+    [SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] + 1;
+  endif;
+
+  // ?? Doesn't mem free list entry have to be zero for process to acquire that mem??
+  //Setting processs in WAIT_MEM to READY
+  alias iter R3;
+  iter = 0;
+  while(iter<15) do
+    if ([PROCESS_TABLE + iter*16 + 4]==WAIT_MEM) then
+      //?? Validating PID -- not necessary??
+      [PROCESS_TABLE + iter*16 + 4] = READY;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  return;
+endif;

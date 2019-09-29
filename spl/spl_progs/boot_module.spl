@@ -42,6 +42,39 @@ loadi(9,22);
 loadi(14,27);
 loadi(15,28);
 
+//INT 9 loading
+loadi(20,33);
+loadi(21,34);
+
+//MOD 1 loading
+loadi(42,55);
+loadi(43,56);
+
+//MOD 2 loading
+loadi(44,57);
+loadi(45,58);
+
+//Inode table + user table loading
+loadi(59,3);
+loadi(60,4);
+
+alias iter R0;
+//Initialize memory free list
+iter = 0;
+while (iter<83) do
+  [MEMORY_FREE_LIST + iter] = 1;
+  iter = iter + 1;
+endwhile;
+while (iter<128) do
+  [MEMORY_FREE_LIST + iter] = 0;
+  iter = iter + 1;
+endwhile;
+
+// Initialize MEM_FREE_COUNT to free pages -- (128-83 = 45)
+[SYSTEM_STATUS_TABLE + 2] = 45;
+//initialize WAIT_MEM_COUNT to 0
+[SYSTEM_STATUS_TABLE + 3] = 0;
+
 //Setting terminal as free
 [TERMINAL_STATUS_TABLE]=0;
 
@@ -78,7 +111,7 @@ PTLR = 10;
 [PTBR+19] = "0110";
 
 
-alias PROC_TAB R0;
+alias PROC_TAB R1;
 PROC_TAB = PROCESS_TABLE + 16;
 // Process table entry for init program
 //pid = 1
@@ -99,9 +132,7 @@ PROC_TAB = PROCESS_TABLE + 16;
 [76*512] = [65*512 + 1];
 
 
-
 //Setting all other process state as TERMINATED
-alias iter R2;
 iter = 2;
 while (iter<=15) do
   [PROCESS_TABLE + iter*16 + 4] = TERMINATED;
