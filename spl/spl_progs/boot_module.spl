@@ -58,6 +58,13 @@ loadi(45,58);
 loadi(59,3);
 loadi(60,4);
 
+//Disk interrupt loading
+loadi(6,19);
+loadi(7,20);
+
+//Initialize disk status to 0
+[DISK_STATUS_TABLE] = 0;
+
 alias iter R0;
 //Initialize memory free list
 iter = 0;
@@ -77,6 +84,14 @@ endwhile;
 
 //Setting terminal as free
 [TERMINAL_STATUS_TABLE]=0;
+
+//Invalidating per process resource table of INIT
+iter = 0;
+while (iter<8) do
+  //Last 16 words of the User Area Page is used for per process resource table
+  [80*512 + 496 + 2*iter] = -1;
+  iter = iter + 1;
+endwhile;
 
 //Setting PTBR for pid = 1, init process
 PTBR = PAGE_TABLE_BASE+20;

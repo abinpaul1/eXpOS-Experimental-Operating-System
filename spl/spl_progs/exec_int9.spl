@@ -63,6 +63,16 @@ addrMemFreeListEntry = MEMORY_FREE_LIST + user_area_page_num;
 
 //Setting SP to initialize the kernel stack
 SP = user_area_page_num*512 - 1;
+
+//Initializing Per-process resource table entries to -1
+iter = 0;
+while (iter<8) do
+  //Last 16 words of the User Area Page is used for per process resource table
+  [user_area_page_num*512 + 496 + 2*iter] = -1;
+  iter = iter + 1;
+endwhile;
+
+
 //Updating state to running
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 4] = RUNNING;
 //Storing the inode index
@@ -166,7 +176,16 @@ iter = 0;
 while(count_iter>0) do
   disk_block = [INODE_TABLE + inode_index*16 + 8 + iter];
   mem_block = [PTBR + 8 + 2*iter];
-  loadi(mem_block, disk_block);
+
+  // Loading from disk using DISK LOAD
+  multipush(R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10);
+  R1 = 2;
+  R2 = [SYSTEM_STATUS_TABLE + 1];
+  R3 = mem_block;
+  R4 = disk_block;
+  call MOD_4;
+  multipop(R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10);
+
   iter = iter + 1;
   count_iter = count_iter - 1;
 endwhile;

@@ -1,11 +1,39 @@
-// Currently only implements Terminal Write, Terminal Read
+// Currently only implements Terminal Write, Terminal Read, Disk Load
 
 alias functionNum R1;
 alias currentPID R2;
-alias word R3;
 
+//Disk Load
+if (functionNum==2) then
+  alias pageNum R3;
+  alias blockNum R4;
+  //Calling acquire disk
+  multipush(R0, R1, R2, R3, R4);
+  R1 = 3;
+  R2 = currentPID;
+  call MOD_0;
+  multipop(R0, R1, R2, R3, R4);
+
+  //Updating Disk status table
+  //Status = Busy-1
+  [DISK_STATUS_TABLE] = 1;
+  //Load - 1/ Store-0 Bit
+  [DISK_STATUS_TABLE + 1] = 1;
+  [DISK_STATUS_TABLE + 2] = pageNum;
+  [DISK_STATUS_TABLE + 3] = blockNum;
+  [DISK_STATUS_TABLE + 4] = currentPID;
+
+  load (pageNum, blockNum);
+  //Setting state of process as wait_disk
+  [PROCESS_TABLE + currentPID*16 + 4] = WAIT_DISK;
+  call MOD_5;
+endif;
+
+
+//Terminal write
 if (functionNum==3) then
   //Acquiring Terminal
+  alias word R3;
   multipush(R0, R1, R2, R3);
   //Storing function number in R1
   R1 = 8;
@@ -24,7 +52,9 @@ if (functionNum==3) then
   multipop(R0, R1, R2, R3);
 endif;
 
+//Terminal Read
 if (functionNum==4) then
+  alias word R3; //Address in which word is to be stored
   //Acquiring Terminal
   multipush(R0, R1, R2, R3);
   //Storing function number in R1
