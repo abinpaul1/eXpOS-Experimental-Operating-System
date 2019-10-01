@@ -13,6 +13,7 @@ if (functionNum==3) then
   return;
 endif;
 
+//Acquire Terminal
 if (functionNum==8) then
   while ([TERMINAL_STATUS_TABLE]==1) do
     [PROCESS_TABLE + currentPID*16 + 4]=WAIT_TERMINAL;
@@ -24,6 +25,7 @@ if (functionNum==8) then
   [TERMINAL_STATUS_TABLE + 1]=currentPID;
 endif;
 
+//Release Terminal
 if(functionNum==9) then
   //If pid of process using terminal and to be scheduled dont match
   if (currentPID != [TERMINAL_STATUS_TABLE+1]) then

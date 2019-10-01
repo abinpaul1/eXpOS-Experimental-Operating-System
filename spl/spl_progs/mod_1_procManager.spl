@@ -35,6 +35,7 @@ if (functionNum==3) then
   return;
 endif;
 
+//Free Page Table
 if (functionNum==4) then
   //Invalidating library pages
   [PAGE_TABLE_BASE + currentPID*20 +0] = -1;
@@ -52,9 +53,33 @@ if (functionNum==4) then
       R2 = [PAGE_TABLE_BASE + currentPID*20 + 2*iter];
       call  MOD_2;
       multipop(R0, R1, R2, R3);
+      // Invalidating the page table entry
       [PAGE_TABLE_BASE + currentPID*20 + 2*iter + 1] = "0000";
     endif;
     iter = iter+1;
+  endwhile;
+
+
+  alias disk_map_proc R4;
+  disk_map_proc = DISK_MAP_TABLE + currentPID*10;
+  //Looping through disk map table entry of process to set entries to -1
+  iter = 0;
+  while (iter <10) do
+    //If valid and stack/heap then release block before setting to -1
+    if ([disk_map_proc + iter]!=-1) then
+      if (iter==2 || iter == 3 || iter==8 || iter==9) then
+        //Calling Release Block
+        multipush(R0, R1, R2, R3, R4);
+        R1 = 4;
+        R3 = currentPID;
+        R2 = [disk_map_proc + iter];
+        call MOD_2;
+        multipop(R0, R1, R2, R3, R4);
+      endif;
+    endif;
+    // Setting entry to -1
+    [disk_map_proc + iter] = -1;
+    iter = iter + 1;
   endwhile;
   return;
 endif;

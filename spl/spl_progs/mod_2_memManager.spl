@@ -1,5 +1,4 @@
-//Get free Page-1 , Release Page Table-2
-
+//Get free Page-1 , Release Page Table-2, Get code page -5
 alias functionNum R1;
 
 //Get free page
@@ -61,5 +60,59 @@ if (functionNum == 2) then
     iter = iter + 1;
   endwhile;
 
+  return;
+endif;
+
+//Release block
+if (functionNum == 4) then
+    alias blockNum R2;
+    alias pid R3;
+    [DISK_FREE_LIST + blockNum] = 0;
+  return;
+endif;
+
+//Get code page
+if (functionNum == 5) then
+  alias blockNum R2;
+  alias currentPID R3;
+  //Checking disk map entries of all process for block number
+  alias iter R4;
+  iter = 0;
+  while (iter<15) do
+    alias iter_entry R5;
+    iter_entry = 0;
+    while(iter_entry<4) do
+      if ([DISK_MAP_TABLE + iter*10 + 4 + iter_entry] == blockNum) then
+        if ( [PAGE_TABLE_BASE + iter*20 + 8 + 2*iter_entry + 1] != "0000") then
+          //Returning memory page number
+          R0 = [PAGE_TABLE_BASE + iter*20 + 8 + 2*iter_entry];
+          //Incrementing mem free list -- page is shared by another process now
+          [MEMORY_FREE_LIST + R0] = [MEMORY_FREE_LIST + R0] + 1;
+          return;
+        endif;
+      endif;
+      iter_entry = iter_entry + 1;
+    endwhile;
+  iter = iter + 1;
+  endwhile;
+  alias free_page R6;
+  multipush(R0, R1, R2, R3, R4, R5);
+  // Function number of get free page in memory manager -- 1
+  R1 = 1;
+  call MOD_2;
+  free_page = R0;
+  multipop(R0, R1, R2, R3, R4, R5);
+  multipush(R0, R1, R2, R3, R4, R5, R6);
+  //Disk load function in device manager module
+  R1 = 2;
+  R4 = blockNum; //R4 = R2
+  R2 = currentPID;// R2 = R3
+  R3 = free_page; //R3 = R6
+
+  call MOD_4;
+  multipop(R0, R1, R2, R3, R4, R5, R6);
+
+  //Returning the memory page number to which code page was loaded
+  R0 = free_page;
   return;
 endif;

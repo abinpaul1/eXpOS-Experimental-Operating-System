@@ -15,7 +15,7 @@ if (functionNum==2) then
   multipop(R0, R1, R2, R3, R4);
 
   //Updating Disk status table
-  //Status = Busy-1
+  //Status = Busy--1
   [DISK_STATUS_TABLE] = 1;
   //Load - 1/ Store-0 Bit
   [DISK_STATUS_TABLE + 1] = 1;

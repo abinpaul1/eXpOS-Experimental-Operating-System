@@ -14,7 +14,7 @@ loadi(23,36);
 loadi(16,29);
 loadi(17,30);
 
-//Exception loading
+//Exception handler loading
 loadi(2, 15);
 loadi(3, 16);
 
@@ -62,6 +62,9 @@ loadi(60,4);
 loadi(6,19);
 loadi(7,20);
 
+//Disk free list loading
+loadi(61, 2);
+
 //Initialize disk status to 0
 [DISK_STATUS_TABLE] = 0;
 
@@ -84,6 +87,21 @@ endwhile;
 
 //Setting terminal as free
 [TERMINAL_STATUS_TABLE]=0;
+
+//Initializing disk map table entries of init -- pid =1
+alias disk_map_entry R1;
+disk_map_entry = DISK_MAP_TABLE + 10;
+
+[disk_map_entry] = -1;
+[disk_map_entry + 1] = -1;
+[disk_map_entry + 2] = -1;
+[disk_map_entry + 3] = -1;
+[disk_map_entry + 4] = 7;
+[disk_map_entry + 5] = 8;
+[disk_map_entry + 6] = -1;
+[disk_map_entry + 7] = -1;
+[disk_map_entry + 8] = -1;
+[disk_map_entry + 9] = -1;
 
 //Invalidating per process resource table of INIT
 iter = 0;
@@ -126,7 +144,7 @@ PTLR = 10;
 [PTBR+19] = "0110";
 
 
-alias PROC_TAB R1;
+alias PROC_TAB R2;
 PROC_TAB = PROCESS_TABLE + 16;
 // Process table entry for init program
 //pid = 1

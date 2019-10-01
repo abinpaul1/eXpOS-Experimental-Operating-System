@@ -16,7 +16,7 @@ fileName = [[PTBR + 2* ( (userSP-2)/512 )]*512 + ((userSP-2)%512)];
 alias inode_index R2;
 inode_index = -1;
 
-//Finding inode index of file
+//Finding inode index of program file
 alias iter R3;
 iter = 1;
 while (iter<=15) do
@@ -78,6 +78,7 @@ endwhile;
 //Storing the inode index
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 7] = inode_index;
 
+
 //Setting Page table entries
 // Shared Library
 [PTBR+0] = 63;
@@ -89,30 +90,12 @@ endwhile;
 alias free_page R6;
 
 
-//Heap
-
-multipush(R0, R1, R2, R3, R4, R5);
-// Function number of get free page in memory manager -- 1
-R1 = 1;
-call MOD_2;
-free_page = R0;
-multipop(R0, R1, R2, R3, R4, R5);
-[PTBR+4] = free_page;
-[PTBR+5] = "0110";
-
-multipush(R0, R1, R2, R3, R4, R5);
-// Function number of get free page in memory manager -- 1
-R1 = 1;
-call MOD_2;
-free_page = R0;
-multipop(R0, R1, R2, R3, R4, R5);
-[PTBR+6] = free_page;
-[PTBR+7] = "0110";
-
-
+//Invalidating Heap page table entries
+[PTBR+5] = "0000";
+[PTBR+7] = "0000";
 
 //Stack
-
+iter = 0;
 multipush(R0, R1, R2, R3, R4, R5);
 // Function number of get free page in memory manager -- 1
 R1 = 1;
@@ -132,63 +115,46 @@ multipop(R0, R1, R2, R3, R4, R5);
 [PTBR+19] = "0110";
 
 
-// Getting count of no. of code pages
-alias count R7;
-count = 0;
-iter = 0;
-while(iter<4) do
-  if ([INODE_TABLE + inode_index*16 + 8 + iter]!=-1) then
-    count = count + 1;
-  endif;
-  iter = iter + 1;
-endwhile;
+alias disk_block R7;
+alias pageNum R8;
+//Loading first code page from disk to memory
+disk_block = [INODE_TABLE + inode_index*16 + 8];
+//Calling get code page
+multipush(R0, R1, R2, R3, R4, R5, R6, R7);
+R1 = 5;
+R2 = disk_block;
+R3 = [SYSTEM_STATUS_TABLE + 1];
+call MOD_2;
+pageNum = R0;
+multipop(R0, R1, R2, R3, R4, R5, R6, R7);
 
 
-//Allocating memory pages for the code
-iter = 0;
-alias count_iter R8;
-count_iter = count;
 
-while(count_iter>0) do
-  multipush(R0, R1, R2, R3, R4, R5, R7, R8);
-  R1 = 1;
-  call MOD_2;
-  free_page = R0;
-  multipop(R0, R1, R2, R3, R4, R5, R7, R8);
-  [PTBR + 8 + 2*iter] = free_page;
-  [PTBR + 8 + 2*iter + 1] = "0100";
-  iter = iter + 1;
-  count_iter = count_iter - 1;
-endwhile;
+//Invalidating code pages except first page
+[PTBR + 8] = pageNum;
+[PTBR + 9] = "1100";
+[PTBR + 11] = "0000";
+[PTBR + 13] = "0000";
+[PTBR + 15] = "0000";
 
-//Setting remaining code pages to invalid
-while(iter<4) do
-  [PTBR + 8 + 2*iter] = -1;
-  [PTBR + 8 + 2*iter + 1] = "0000";
-  iter = iter + 1;
-endwhile;
 
-alias disk_block R9;
-alias mem_block R10;
-//Loading code from disk to memory
-count_iter = count;
-iter = 0;
-while(count_iter>0) do
-  disk_block = [INODE_TABLE + inode_index*16 + 8 + iter];
-  mem_block = [PTBR + 8 + 2*iter];
 
-  // Loading from disk using DISK LOAD
-  multipush(R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10);
-  R1 = 2;
-  R2 = [SYSTEM_STATUS_TABLE + 1];
-  R3 = mem_block;
-  R4 = disk_block;
-  call MOD_4;
-  multipop(R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10);
-
-  iter = iter + 1;
-  count_iter = count_iter - 1;
-endwhile;
+//Initializing disk map table of the process
+alias diskMapTableAddr R8;
+diskMapTableAddr = DISK_MAP_TABLE + [SYSTEM_STATUS_TABLE + 1]*10;
+[diskMapTableAddr] = -1;
+[diskMapTableAddr + 1] = -1;
+//Heap blocks
+[diskMapTableAddr + 2] = -1;
+[diskMapTableAddr + 3] = -1;
+//Code blocks
+[diskMapTableAddr + 4] = [INODE_TABLE + inode_index*16 + 8];
+[diskMapTableAddr + 5] = [INODE_TABLE + inode_index*16 + 9];
+[diskMapTableAddr + 6] = [INODE_TABLE + inode_index*16 + 10];
+[diskMapTableAddr + 7] = [INODE_TABLE + inode_index*16 + 11];
+//Stack blocks
+[diskMapTableAddr + 8] = -1;
+[diskMapTableAddr + 9] = -1;
 
 //Entry point value to user stack top
 [[PTBR + 16]*512] = [[PTBR + 8]*512 + 1];

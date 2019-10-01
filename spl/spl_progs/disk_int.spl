@@ -4,7 +4,7 @@
 SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1]*16 ) + 11]*512 - 1;
 backup;
 
-// Setting disk status to free-0
+// Setting disk status to free--0
 [DISK_STATUS_TABLE] = 0;
 
 // Setting processes in WAIT_DISK to READY
