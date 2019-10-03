@@ -1,7 +1,28 @@
-//Free User Area Page-2 , Exit Process-3 , Free Page Table-4
+//Get PCB entry - 1, Free User Area Page-2 , Exit Process-3 , Free Page Table-4
 
 alias functionNum R1;
 alias currentPID R2;
+
+//Get PCB entry
+if (functionNum==1) then
+  alias iter R3;
+  iter = 0;
+  while (iter<16) do
+    //Getting the entry number of first terminated process
+    if ([PROCESS_TABLE + iter*16 + 4] == TERMINATED) then
+      [PROCESS_TABLE + iter*16 + 1] = iter;
+      [PROCESS_TABLE + iter*16 + 4] = ALLOCATED;
+      [PROCESS_TABLE + iter*16 + 14] = PAGE_TABLE_BASE + iter*20;
+      [PROCESS_TABLE + iter*16 + 15] = 10;
+      R0 = iter;
+      return;
+    endif;
+    iter = iter + 1;
+  endwhile;
+  R0 = -1;
+  return;
+endif;
+
 
 ///Free User Area Page
 if (functionNum==2) then

@@ -49,6 +49,8 @@ PTLR = [new_process_table + 15];
 
 if ([new_process_table + 4] == CREATED) then
     SP = [new_process_table + 13];
+    //Setting BP to the value stored at the beginning of the kernel stack
+    BP = [[new_process_table + 11]*512 + [new_process_table + 12]];
     [new_process_table + 4] = RUNNING;
     // Mode flag to 0
     [new_process_table + 9] = 0;

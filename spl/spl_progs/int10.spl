@@ -1,29 +1,14 @@
-//Invoking process state = TERMINATED
-[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1]*16 ) + 4] = TERMINATED;
+//Setting mode flag to sys call number-10
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 10;
 
-alias id_addr R0;
-alias id R1;
-alias check_all_terminated R2;
-//Getting pid of second process table entry
-id_addr = PROCESS_TABLE + 16;
-id = [id_addr + 1];
-check_all_terminated = 1;
+//Switching to kernel stack
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 - 1;
 
-alias iter R3;
-iter = 1;
-// Loops till end of process table
-while (iter<=15) do
-    if ([id_addr + 4] != TERMINATED) then
-      check_all_terminated = 0;
-      break;
-    endif;
-    id_addr = id_addr + 16;
-    id = [id_addr + 1];
-    iter = iter + 1;
-endwhile;
+//Calling exit process
+R1 = 3;
+R2 = [SYSTEM_STATUS_TABLE + 1];
+call MOD_1;
 
-if (check_all_terminated == 1) then
-  halt;
-else
-  call MOD_5;
-endif;
+//Calling scheduler
+call MOD_5;
