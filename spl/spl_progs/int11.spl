@@ -43,10 +43,12 @@ if (sys_call_num==13) then
 
   alias waitPID R3;
   //Extracting first argument - waitPID
-  waitPID = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+  waitPID = [[PTBR + 2*((userSP-4)/512)]*512 + ((userSP-4)%512) ];
 
-  if ( (waitPID == currentPID) || ([PROCESS_TABLE + waitPID*16 + 4] == TERMINATED) ) then
+  if ( (waitPID < 0) || (waitPID > 15) || (waitPID == currentPID) || ([PROCESS_TABLE + waitPID*16 + 4] == TERMINATED) ) then
     SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
     //Storing return value in stack
     [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
     ireturn;

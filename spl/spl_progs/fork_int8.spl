@@ -94,12 +94,22 @@ multipop(R0, R1, R2);
 [PROCESS_TABLE + childPID*16 + 13] = [PROCESS_TABLE + parentPID*16 + 13];
 
 
-//Copying per process resource tabele
+//Copying per process resource table
 alias iter R4;
 iter = 0;
-while (iter<16) do
-  //Last 16 words of the User Area Page is used for per process resource table
-  [[PROCESS_TABLE + childPID*16 + 11]*512 + 496 + iter] = [[PROCESS_TABLE + parentPID*16 + 11]*512 + 496 + iter];
+while (iter<8) do
+  alias rt_entry_child R5;
+  rt_entry_child = [PROCESS_TABLE + childPID*16 + 11]*512 + 496 + 2*iter;
+
+  [rt_entry_child] = [[PROCESS_TABLE + parentPID*16 + 11]*512 + 496 + 2*iter];
+  [rt_entry_child + 1] = [[PROCESS_TABLE + parentPID*16 + 11]*512 + 496 + 2*iter + 1];
+
+  if ( [rt_entry_child] == SEMAPHORE) then
+    //Incrementing process count entry in semaphore table
+    alias sem_table_index R6;
+    sem_table_index = [rt_entry_child + 1];
+    [SEMAPHORE_TABLE + sem_table_index + 1] = [SEMAPHORE_TABLE + sem_table_index + 1] + 1;
+  endif;
   iter = iter + 1;
 endwhile;
 

@@ -54,6 +54,14 @@ loadi(21,34);
 loadi(24,37);
 loadi(25,38);
 
+//INT 13 loading
+loadi(28,41);
+loadi(29,42);
+
+//INT 14 loading
+loadi(30,43);
+loadi(31,44);
+
 //INT 15 loading
 loadi(32,45);
 loadi(33,46);
@@ -77,10 +85,22 @@ loadi(7,20);
 //Disk free list loading
 loadi(61, 2);
 
+alias iter R0;
+
+//Initializing semaphore table
+iter = 0;
+while (iter<32) do
+  //locking pid to -1
+  [SEMAPHORE_TABLE + iter*4] = -1;
+  //process count to 0
+  [SEMAPHORE_TABLE + iter*4 + 1] = 0;
+  iter = iter + 1;
+endwhile;
+
 //Initialize disk status to 0
 [DISK_STATUS_TABLE] = 0;
 
-alias iter R0;
+
 //Initialize memory free list
 iter = 0;
 while (iter<83) do

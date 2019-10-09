@@ -11,7 +11,9 @@ process_table_entry = PROCESS_TABLE + currentPID*16;
 
 [process_table_entry + 4] = READY;
 
+backup;
 call MOD_5;
+restore;
 
 alias newPID R4;
 newPID = [SYSTEM_STATUS_TABLE+1];

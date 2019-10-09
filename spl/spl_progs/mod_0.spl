@@ -13,6 +13,56 @@ if (functionNum==3) then
   return;
 endif;
 
+//Acquire Semaphore
+if (functionNum==6) then
+  alias iter R3;
+  iter = 0;
+  //MAX_SEM_COUNT = 32;
+  while (iter<32) do
+    if( [SEMAPHORE_TABLE + iter*4 + 1] == 0) then
+      //Incrementing process count;
+      [SEMAPHORE_TABLE + iter*4 + 1] = 1;
+      //Setting locking PID field to -1;
+      [SEMAPHORE_TABLE + iter*4] = -1;
+      break;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  //If no entries are free
+  if (iter==32) then
+    R0 = -1;
+    return;
+  endif;
+
+  R0 = iter;
+  return;
+endif;
+
+//Release Semaphore
+if (functionNum==7) then
+  alias st_index R3;
+  //If locking PID matches PID provided
+  if ([SEMAPHORE_TABLE + st_index*4] == currentPID) then
+    //Setting locking PID to -1 -- unlocking before release
+    [SEMAPHORE_TABLE + st_index*4] = -1;
+
+    alias iter R4;
+    iter = 0;
+    while(iter<16) do
+      if ( ([PROCESS_TABLE + iter*16 + 4] == WAIT_SEMAPHORE) && ([PROCESS_TABLE + iter*16 + 5] == st_index) ) then
+        [PROCESS_TABLE + iter*16 + 4] = READY;
+        [PROCESS_TABLE + iter*16 + 5] = -1;
+      endif;
+      iter = iter + 1;
+    endwhile;
+  endif;
+  //Decrement process count
+  [SEMAPHORE_TABLE + st_index*4 + 1] = [SEMAPHORE_TABLE + st_index*4 + 1] - 1;
+  return;
+endif;
+
+
 //Acquire Terminal
 if (functionNum==8) then
   while ([TERMINAL_STATUS_TABLE]==1) do
@@ -23,6 +73,7 @@ if (functionNum==8) then
   endwhile;
   [TERMINAL_STATUS_TABLE]=1;
   [TERMINAL_STATUS_TABLE + 1]=currentPID;
+  return;
 endif;
 
 //Release Terminal
@@ -49,7 +100,5 @@ if(functionNum==9) then
 
   //Set return value as 0
   R0 = 0;
+  return;
 endif;
-
-
-return;
