@@ -50,6 +50,14 @@ loadi(19,32);
 loadi(20,33);
 loadi(21,34);
 
+//INT 11 loading
+loadi(24,37);
+loadi(25,38);
+
+//INT 15 loading
+loadi(32,45);
+loadi(33,46);
+
 //MOD 1 loading
 loadi(42,55);
 loadi(43,56);

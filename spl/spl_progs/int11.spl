@@ -1,0 +1,99 @@
+alias userSP R0;
+userSP = SP;
+
+
+// SP value is stored in UPTR field of process table
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] = SP;
+
+// Changing to kernel stack
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11]*512 - 1;
+
+//Extracting system call numebr from user stack -- value in userSP-5
+alias sys_call_num R1;
+sys_call_num = [[PTBR + 2*((userSP-5)/512)]*512 + (userSP-5)%512];
+
+
+//Getpid system call
+if (sys_call_num == 11) then
+  SP = userSP;
+  //Storing return value in stack
+  [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = [SYSTEM_STATUS_TABLE + 1];
+  ireturn;
+endif;
+
+
+//Getppid system call
+if (sys_call_num == 12) then
+  alias currentPID R2;
+  currentPID = [SYSTEM_STATUS_TABLE + 1];
+  SP = userSP;
+  //Storing return value in stack
+  [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = [PROCESS_TABLE + currentPID*16 + 2];
+  ireturn;
+endif;
+
+
+//Wait system call
+if (sys_call_num==13) then
+  alias currentPID R2;
+  currentPID = [SYSTEM_STATUS_TABLE + 1];
+
+  //Mode field is set to 13 in process table
+  [PROCESS_TABLE + currentPID*16 + 9] = 13;
+
+  alias waitPID R3;
+  //Extracting first argument - waitPID
+  waitPID = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+  if ( (waitPID == currentPID) || ([PROCESS_TABLE + waitPID*16 + 4] == TERMINATED) ) then
+    SP = userSP;
+    //Storing return value in stack
+    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+    ireturn;
+  endif;
+
+  //Changing status in process table
+  [PROCESS_TABLE + currentPID*16 + 4] = WAIT_PROCESS;
+  [PROCESS_TABLE + currentPID*16 + 5] = waitPID;
+
+  backup;
+  call MOD_5;
+  restore;
+
+  //Setting back user stack
+  SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13];
+  //Mode field reset to 0
+  [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+  //Storing return value in stack
+  [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = 0;
+  ireturn;
+endif;
+
+
+//Signal system call
+if (sys_call_num==14) then
+  alias currentPID R2;
+  currentPID = [SYSTEM_STATUS_TABLE + 1];
+
+  //Setting mode flag to 14
+  [PROCESS_TABLE + currentPID*16 + 9] = 14;
+
+  alias iter R3;
+  iter = 0;
+  while(iter<16) do
+    if ( [PROCESS_TABLE + iter*16 + 4] == WAIT_PROCESS ) then
+      if ( [PROCESS_TABLE + iter*16 + 5] == currentPID) then
+        [PROCESS_TABLE + iter*16 + 4] = READY;
+        [PROCESS_TABLE + iter*16 + 5] = -1;
+      endif;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  SP = [PROCESS_TABLE + currentPID*16 + 13];
+  //Mode field reset to 0
+  [PROCESS_TABLE + currentPID*16 + 9] = 0;
+  //Storing return value in stack
+  [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = 0;
+  ireturn;
+endif;
