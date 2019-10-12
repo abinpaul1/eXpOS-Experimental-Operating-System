@@ -13,6 +13,60 @@ if (functionNum==3) then
   return;
 endif;
 
+//Acquire inode
+if (functionNum == 4) then
+  alias inode_index R3;
+
+  //Checking if inode is locked
+  while ([FILE_STATUS_TABLE + inode_index*4] != -1) do
+    [PROCESS_TABLE + currentPID*16 + 4]=WAIT_FILE;
+    [PROCESS_TABLE + currentPID*16 + 5]=inode_index;
+    multipush(R1, R2,R3);
+    call MOD_5;
+    multipop(R1, R2,R3);
+  endwhile;
+
+  if ([INODE_TABLE + inode_index*16 + 1] == -1) then
+    R0 = -1;
+    return;
+  endif;
+
+  //Locking the inode
+  [FILE_STATUS_TABLE + inode_index*4] = currentPID;
+
+  R0 = 0;
+  return;
+endif;
+
+
+//Release inode
+if (functionNum==5) then
+  alias inode_index R3;
+
+  //If locking PID and currentPID do not match
+  if ([FILE_STATUS_TABLE + inode_index*4] != currentPID) then
+    R0 = -1;
+    return;
+  endif;
+
+  //Setting lock status to -1
+  [FILE_STATUS_TABLE + inode_index*4] = -1;
+
+  //Changing state of waiting processes
+  alias iter R4;
+  iter = 0;
+  while(iter<16) do
+    if ( ([PROCESS_TABLE + iter*16 + 4] == WAIT_FILE) && ([PROCESS_TABLE + iter*16 + 5] == inode_index) ) then
+      [PROCESS_TABLE + iter*16 + 4] = READY;
+      [PROCESS_TABLE + iter*16 + 5] = -1;
+    endif;
+    iter = iter + 1;
+  endwhile;
+  R0 = 0;
+  return;
+endif;
+
+
 //Acquire Semaphore
 if (functionNum==6) then
   alias iter R3;

@@ -19,7 +19,7 @@ inode_index = -1;
 //Finding inode index of program file
 alias iter R3;
 iter = 1;
-while (iter<=15) do
+while (iter<60) do
   if ( ([(INODE_TABLE + iter*16)] == EXEC) && ([(INODE_TABLE + iter*16) + 1] == fileName) ) then
     inode_index = iter;
     break;

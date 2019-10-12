@@ -38,6 +38,10 @@ loadi(49,62);
 loadi(8,21);
 loadi(9,22);
 
+//INT 4 loading
+loadi(10,23);
+loadi(11,24);
+
 //INT 6 loading
 loadi(14,27);
 loadi(15,28);
@@ -83,9 +87,30 @@ loadi(6,19);
 loadi(7,20);
 
 //Disk free list loading
-loadi(61, 2);
+loadi(61,2);
+
+//Root file memory copy loading
+loadi(62,5);
 
 alias iter R0;
+
+//Initializing file status table
+iter = 0;
+while(iter<60) do
+  [FILE_STATUS_TABLE + iter*4] = -1;
+  [FILE_STATUS_TABLE + iter*4 + 1] = -1;
+  iter = iter + 1;
+endwhile;
+
+//Initializing the buffer table
+iter = 0;
+while(iter<4) do
+  [BUFFER_TABLE + iter*4] = -1;
+  //Setting dirty bit to 0
+  [BUFFER_TABLE + iter*4 + 1] = 0;
+  [BUFFER_TABLE + iter*4 + 2] = -1;
+  iter = iter + 1;
+endwhile;
 
 //Initializing semaphore table
 iter = 0;
@@ -181,6 +206,8 @@ PROC_TAB = PROCESS_TABLE + 16;
 // Process table entry for init program
 //pid = 1
 [PROC_TAB + 1] = 1;
+//Setting user id of init to root
+[PROC_TAB + 3] = 1;
 //Assigning UArea page number
 [PROC_TAB + 11] = 80;
 //State is CREATED as idle process is going to be scheduled first

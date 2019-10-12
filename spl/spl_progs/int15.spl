@@ -1,0 +1,59 @@
+alias userSP R0;
+userSP = SP;
+
+alias currentPID R1;
+currentPID = [SYSTEM_STATUS_TABLE + 1];
+// SP value is stored in UPTR field of process table
+[PROCESS_TABLE + currentPID*16 + 13] = SP;
+
+// Changing to kernel stack
+SP = [PROCESS_TABLE + currentPID*16 + 11]*512 - 1;
+
+//Setting mode flag
+[PROCESS_TABLE + currentPID*16 + 9] = 21;
+
+//If current process is not shell or current user is not root
+if ( ([PROCESS_TABLE + currentPID*16 + 3]!=1) || ([PROCESS_TABLE + currentPID*16 + 3]!=1) ) then
+  SP = userSP;
+  //Mode field reset to 0
+  [PROCESS_TABLE + currentPID*16 + 9] = 0;
+  //Storing return value in stack
+  [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+  ireturn;
+endif;
+
+//Storing inode table, user table to disk
+multipush(R0);
+R1 = 1;
+R2 = currentPID;
+R3 = 59;
+R4 = 3;
+call MOD_4;
+multipop(R0);
+
+multipush(R0);
+R1 = 1;
+R2 = currentPID;
+R3 = 60;
+R4 = 4;
+call MOD_4;
+multipop(R0);
+
+//Storing root file, disk free list
+multipush(R0);
+R1 = 1;
+R2 = currentPID;
+R3 = 62;
+R4 = 5;
+call MOD_4;
+multipop(R0);
+
+multipush(R0);
+R1 = 1;
+R2 = currentPID;
+R3 = 61;
+R4 = 2;
+call MOD_4;
+multipop(R0);
+
+halt;
