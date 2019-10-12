@@ -5,48 +5,164 @@
 alias userSP R0;
 userSP=SP;
 
-[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13] = SP;
-SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 - 1;
+alias currentPID R2;
+currentPID = [SYSTEM_STATUS_TABLE+1];
 
-alias physicalPageNum R1;
-alias offset R2;
-alias fileDescPhysicalAddr R3;
-// userSP - 4 contains argument 1 ie, logical address of filedesc
-// Finding physical address
-physicalPageNum = [PTBR + 2*( (userSP - 4)/512 )];
-offset = (userSP - 4)%512;
-fileDescPhysicalAddr = physicalPageNum*512 + offset;
-alias fileDesc R4;
-fileDesc = [fileDescPhysicalAddr];
+[PROCESS_TABLE + currentPID*16 + 13] = SP;
+SP = [PROCESS_TABLE + currentPID*16 + 11]*512 - 1;
 
-if (fileDesc!=-1) then
-  //userSP -1 stores logical adress of return value
-  alias physicalAddrOfRetVal R5;
-  physicalAddrOfRetVal = [PTBR + 2* ((userSP-1)/512)]*512 + ((userSP-1)%512);
-  [physicalAddrOfRetVal] = -1;
-else
+
+alias fileDesc R3;
+fileDesc = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+if (fileDesc == -1) then
+  //Input from terminal
   // userSP - 3 contains argument 2 -- logical address of variable to be read into
-  alias input_word R5;
+  alias input_word R4;
   input_word = [[PTBR + 2* ((userSP-3)/512)]*512 + ((userSP-3)%512)];
 
-  multipush(R0, R1, R2, R3, R4, R5);
+  multipush(R0, R1, R2, R3, R4);
   //R1- function call number of terminal read
   //R0 will have return value after call
   R1 = 4;
   R2 = [SYSTEM_STATUS_TABLE + 1];
   R3 = input_word;
   call MOD_4;
-  multipop(R0, R1, R2, R3, R4, R5);
-  //Setting 0--success as return value
-  alias physicalAddrOfRetVal R6;
-  physicalAddrOfRetVal = [PTBR + 2* ((userSP-1)/512)]*512 + ((userSP-1)%512);
-  [physicalAddrOfRetVal] = 0;
+  multipop(R0, R1, R2, R3, R4);
+else
+  //Input from file
+  if ( (fileDesc<0) || (fileDesc>7) ) then
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    //Storing return value in stack
+    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+    ireturn;
+  endif;
 
+  alias res_table_entry R4;
+  res_table_entry = [PROCESS_TABLE + currentPID*16 + 11]*512 + 496 + 2*fileDesc;
+
+  //If the Resource identifier field does not indicate a FILE--0
+  if ( [res_table_entry]!=0 ) then
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    //Storing return value in stack
+    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+    ireturn;
+  endif;
+
+  alias open_tab_index R5;
+  open_tab_index = [res_table_entry + 1];
+
+  alias inode_index R6;
+  inode_index = [OPEN_FILE_TABLE + open_tab_index*4];
+
+  //Acquiring inode
+  multipush(R0,R1,R2,R3,R5,R6);
+  R1 = 4;
+  R2 = currentPID;
+  R3 = inode_index;
+  call MOD_0;
+  R7 = R0; //R7 temporarily holds return value
+  multipop(R0,R1,R2,R3,R5,R6);
+
+  //If Acquiring failed, return -1
+  if (R7 == -1) then
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    //Storing return value in stack
+    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+    ireturn;
+  endif;
+
+  alias lseek_pos R7;
+  lseek_pos = [OPEN_FILE_TABLE + open_tab_index*4 + 2];
+
+  // userSP - 3 contains argument 2 -- logical address of variable to be read into
+  alias word_logical R8;
+  word_logical = [[PTBR + 2* ((userSP-3)/512)]*512 + ((userSP-3)%512)];
+  alias word_addr R9;
+  word_addr = [PAGE_TABLE_BASE + currentPID*20 + 2*(word_logical/512)]*512 + (word_logical%512);
+
+
+  //If file corresponds to root file
+  if ( [OPEN_FILE_TABLE + open_tab_index*4] == INODE_ROOT ) then
+    //If the lseek value is equal to the root file size--480
+    if (lseek_pos == 480) then
+      //Releasing inode
+      multipush(R0,R1,R2,R3,R5,R6,R7,R8,R9);
+      R1 = 5;
+      R2 = currentPID;
+      R3 = inode_index;
+      call MOD_0;
+      multipop(R0,R1,R2,R3,R5,R6,R7,R8,R9);
+
+      SP = userSP;
+      //Mode field reset to 0
+      [PROCESS_TABLE + currentPID*16 + 9] = 0;
+      //Storing return value in stack
+      [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -2;
+      ireturn;
+    endif;
+    //Reading from lseek position in memory copy of root file
+    [word_addr] = [ROOT_FILE + lseek_pos];
+    //Incrementing lseek_pos
+    [OPEN_FILE_TABLE + open_tab_index*4 + 2] = [OPEN_FILE_TABLE + open_tab_index*4 + 2] + 1;
+  else
+    //If end of file reached -- lseek_pos = file_size
+
+    if (lseek_pos == [INODE_TABLE + inode_index*16 + 2]) then
+      //Releasing inode
+      multipush(R0,R1,R2,R3,R5,R6,R7,R8,R9);
+      R1 = 5;
+      R2 = currentPID;
+      R3 = inode_index;
+      call MOD_0;
+      multipop(R0,R1,R2,R3,R5,R6,R7,R8,R9);
+
+      SP = userSP;
+      //Mode field reset to 0
+      [PROCESS_TABLE + currentPID*16 + 9] = 0;
+      //Storing return value in stack
+      [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -2;
+      ireturn;
+    endif;
+
+    // Block index = lseek/512
+    alias disk_block_num R10;
+    disk_block_num = [INODE_TABLE + inode_index*16 + 8 + (lseek_pos/512)];
+    alias offset R11;
+    offset = lseek_pos%512;
+
+
+    //Calling buffered read
+    multipush(R0,R1,R2,R3,R4,R5,R6,R7,R8,R9,R10,R11);
+    R1 = 2;
+    R2 = disk_block_num;
+    R3 = offset;
+    R4 = word_addr;
+    call MOD_3;
+    multipop(R0,R1,R2,R3,R4,R5,R6,R7,R8,R9,R10,R11);
+
+    //Incrementing lseek_pos
+    [OPEN_FILE_TABLE + open_tab_index*4 + 2] = [OPEN_FILE_TABLE + open_tab_index*4 + 2] + 1;
+  endif;
+  //Releasing inode
+  multipush(R0,R1,R2,R3,R5,R6,R7,R8,R9);
+  R1 = 5;
+  R2 = currentPID;
+  R3 = inode_index;
+  call MOD_0;
+  multipop(R0,R1,R2,R3,R5,R6,R7,R8,R9);
 endif;
 
 //Mode flag to 0
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
 //SP to user stack
 SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
-
+//Storing return value in stack
+[[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = 0;
 ireturn;

@@ -1,0 +1,13 @@
+int main()
+{
+decl
+  str name;
+  int temp;
+enddecl
+begin
+  temp = exposcall("Read",-1,name);
+  temp = exposcall("Write",-2,name);
+  temp = exposcall("Exec",name);
+  return 0;
+end
+}

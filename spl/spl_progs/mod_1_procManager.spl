@@ -43,9 +43,21 @@ if (functionNum==2) then
       call MOD_0;
       multipop(R0, R1, R2, R3, R4, R5);
     endif;
+
+    if ([res_table_entry] == FILE) then
+      alias open_tab_index R5;
+      open_tab_index = [res_table_entry + 1];
+      //Calling close function
+      multipush(R0,R1,R2,R3,R4,R5);
+      R1 = 4;
+      R2 = open_tab_index;
+      call MOD_3;
+      multipop(R0,R1,R2,R3,R4,R5);
+    endif;
+
     iter = iter + 1;
   endwhile;
-  
+
   //Invoking Release page
   multipush(R0, R1, R2);
   R1 = 2;

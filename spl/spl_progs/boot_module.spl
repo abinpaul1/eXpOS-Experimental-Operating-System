@@ -6,14 +6,6 @@ loadi(66,8);
 loadi(63,13);
 loadi(64,14);
 
-//INT 10 loading
-loadi(22,35);
-loadi(23,36);
-
-//INT 7 loading
-loadi(16,29);
-loadi(17,30);
-
 //Exception handler loading
 loadi(2, 15);
 loadi(3, 16);
@@ -21,18 +13,6 @@ loadi(3, 16);
 // Timer interrupt loading
 loadi(4, 17);
 loadi(5, 18);
-
-//MOD 5 loading
-loadi(50,63);
-loadi(51,64);
-
-//MOD 0 loading
-loadi(40,53);
-loadi(41,54);
-
-//MOD 4 loading
-loadi(48,61);
-loadi(49,62);
 
 //Console interrupt loading
 loadi(8,21);
@@ -42,9 +22,17 @@ loadi(9,22);
 loadi(10,23);
 loadi(11,24);
 
+//INT 5 loading
+loadi(12,25);
+loadi(13,26);
+
 //INT 6 loading
 loadi(14,27);
 loadi(15,28);
+
+//INT 7 loading
+loadi(16,29);
+loadi(17,30);
 
 //INT 8 loading
 loadi(18,31);
@@ -53,6 +41,10 @@ loadi(19,32);
 //INT 9 loading
 loadi(20,33);
 loadi(21,34);
+
+//INT 10 loading
+loadi(22,35);
+loadi(23,36);
 
 //INT 11 loading
 loadi(24,37);
@@ -70,6 +62,10 @@ loadi(31,44);
 loadi(32,45);
 loadi(33,46);
 
+//MOD 0 loading
+loadi(40,53);
+loadi(41,54);
+
 //MOD 1 loading
 loadi(42,55);
 loadi(43,56);
@@ -77,6 +73,18 @@ loadi(43,56);
 //MOD 2 loading
 loadi(44,57);
 loadi(45,58);
+
+//MOD 3 loading
+loadi(46,59);
+loadi(47,60);
+
+//MOD 4 loading
+loadi(48,61);
+loadi(49,62);
+
+//MOD 5 loading
+loadi(50,63);
+loadi(51,64);
 
 //Inode table + user table loading
 loadi(59,3);
@@ -93,6 +101,14 @@ loadi(61,2);
 loadi(62,5);
 
 alias iter R0;
+
+//Initializing open file table
+iter = 0;
+while(iter<32) do
+  [OPEN_FILE_TABLE + iter*4] = -1;
+  [OPEN_FILE_TABLE + iter*4 + 1] = 0;
+  iter = iter + 1;
+endwhile;
 
 //Initializing file status table
 iter = 0;

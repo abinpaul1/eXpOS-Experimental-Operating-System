@@ -1,0 +1,125 @@
+alias userSP R0;
+userSP = SP;
+
+alias currentPID R1;
+currentPID = [SYSTEM_STATUS_TABLE + 1];
+
+// SP value is stored in UPTR field of process table
+[PROCESS_TABLE + currentPID*16 + 13] = SP;
+
+// Changing to kernel stack
+SP = [PROCESS_TABLE + currentPID*16 + 11]*512 - 1;
+
+//Extracting system call numebr from user stack -- value in userSP-5
+alias sys_call_num R2;
+sys_call_num = [[PTBR + 2*((userSP-5)/512)]*512 + (userSP-5)%512];
+
+//Open
+if (sys_call_num==2) then
+  //Setting mode flag to 2
+  [PROCESS_TABLE + currentPID*16 + 9] = 2;
+
+  alias file_name R3;
+  file_name = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+  alias user_area_page_num R4;
+  user_area_page_num = [PROCESS_TABLE + currentPID*16 + 11];
+
+  //Finding index of free entry from Per-process resource table
+  alias iter R5;
+  iter = 0;
+  while (iter<8) do
+    //Last 16 words of the User Area Page is used for per process resource table
+    if ([user_area_page_num*512 + 496 + 2*iter] == -1 ) then
+      break;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  //If no free entry exists
+  if (iter==8) then
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    //Storing return value in stack
+    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -3;
+    ireturn;
+  endif;
+
+  alias free_index R6;
+  free_index = iter;
+
+  alias open_tab_index R7;
+  //Calling open function
+  multipush(R0,R1,R2,R3,R4,R5,R6);
+  R1 = 3;
+  R2 = file_name;
+  call MOD_3;
+  open_tab_index = R0;
+  multipop(R0,R1,R2,R3,R4,R5,R6);
+
+  //Returning error code if failed
+  if ( (open_tab_index == -1) || (open_tab_index==-2) )then
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    //Storing return value in stack
+    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = open_tab_index;
+    ireturn;
+  endif;
+
+  //Setting per process resource table entry
+  //Setting resource identifier field to 0--FILE
+  [user_area_page_num*512 + 496 + 2*free_index] = 0;
+  //Storing open file table index in Per process resource table
+  [user_area_page_num*512 + 496 + 2*free_index + 1] = open_tab_index;
+
+  SP = [PROCESS_TABLE + currentPID*16 + 13];
+  //Mode field reset to 0
+  [PROCESS_TABLE + currentPID*16 + 9] = 0;
+  //Storing return value in stack
+  [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = free_index;
+  ireturn;
+endif;
+
+//Close
+if (sys_call_num==3) then
+  //Setting mode flag to 3
+  [PROCESS_TABLE + currentPID*16 + 9] = 3;
+
+  alias file_desc R3;
+  file_desc = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+  alias res_table_entry R4;
+  res_table_entry = [PROCESS_TABLE + currentPID*16 + 11]*512 + 496 + 2*file_desc;
+
+  //If file descriptor is invalid or does not indicate file--0
+  if ( (file_desc<0) || (file_desc>7) || ([res_table_entry]!=0) ) then
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    //Storing return value in stack
+    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+    ireturn;
+  endif;
+
+  alias open_tab_index R5;
+  open_tab_index = [res_table_entry + 1];
+
+  //Calling close function
+  multipush(R0,R1,R2,R3,R4,R5);
+  R1 = 4;
+  R2 = open_tab_index;
+  call MOD_3;
+  multipop(R0,R1,R2,R3,R4,R5);
+
+  //Invalidating per process resource table entry
+  [res_table_entry] = -1;
+
+  SP = [PROCESS_TABLE + currentPID*16 + 13];
+  //Mode field reset to 0
+  [PROCESS_TABLE + currentPID*16 + 9] = 0;
+  //Storing return value in stack
+  [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = 0;
+  ireturn;
+endif;

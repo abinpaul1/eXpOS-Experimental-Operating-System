@@ -1,0 +1,53 @@
+type
+  list
+  {
+    int data;
+    list next;
+  }
+endtype
+
+decl
+  list head;
+enddecl
+
+int main()
+{
+  decl
+    int n, num, temp, val;
+    list p,q;
+  enddecl
+
+  begin
+
+    temp = exposcall("Heapset");
+    temp = exposcall("Write",-2,"LOL");
+    head = null;
+
+    temp = exposcall("Read",-1,n);
+     
+    num = 0;
+    while (num<n) do
+      temp = exposcall("Read",-1,val);
+      p = exposcall("Alloc",8);
+      p.data = val;
+      p.next = null;
+
+      if (head==null) then
+        head = p;
+        q = p;
+      else
+        q.next = p;
+        q = q.next;
+      endif;
+
+      num = num + 1;
+    endwhile;
+
+    p = head;
+    while (p!=null) do
+      temp = exposcall("Write",-2,p.data);
+      p = p.next;
+    endwhile;
+  return 0;
+  end
+}

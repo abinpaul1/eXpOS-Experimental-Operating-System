@@ -12,7 +12,9 @@ if (functionNum == 1) then
   while ([SYSTEM_STATUS_TABLE + 2]==0) do
     [PROCESS_TABLE + currentPID*16 + 4]=WAIT_MEM;
     //Scheduling other process
+    backup;
     call MOD_5;
+    restore;
   endwhile;
 
   //Decrementing WAIT_MEM_COUNT
@@ -52,7 +54,7 @@ if (functionNum == 2) then
   //Setting processs in WAIT_MEM to READY
   alias iter R3;
   iter = 0;
-  while(iter<15) do
+  while(iter<16) do
     if ([PROCESS_TABLE + iter*16 + 4]==WAIT_MEM) then
       //?? Validating PID -- not necessary??
       [PROCESS_TABLE + iter*16 + 4] = READY;
@@ -78,7 +80,7 @@ if (functionNum == 5) then
   //Checking disk map entries of all process for block number
   alias iter R4;
   iter = 0;
-  while (iter<15) do
+  while (iter<16) do
     alias iter_entry R5;
     iter_entry = 0;
     while(iter_entry<4) do

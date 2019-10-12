@@ -1,6 +1,45 @@
 alias functionNum R1;
 alias currentPID R2;
 
+//Acquire buffer
+if (functionNum==1) then
+  alias buffer_num R3;
+  while ( [BUFFER_TABLE + buffer_num*4 + 2] != -1) do
+    [PROCESS_TABLE + currentPID*16 + 4]=WAIT_BUFFER;
+    [PROCESS_TABLE + currentPID*16 + 5]=buffer_num;
+    multipush(R1, R2,R3);
+    call MOD_5;
+    multipop(R1, R2,R3);
+  endwhile;
+  //Locking the buffer
+  [BUFFER_TABLE + buffer_num*4 + 2] = currentPID;
+  return;
+endif;
+
+//Release buffer
+if (functionNum==2) then
+  alias buffer_num R3;
+  if ([BUFFER_TABLE + buffer_num*4 + 2] != currentPID) then
+    R0 = -1;
+    return;
+  endif;
+  //Unlocking the buffer
+  [BUFFER_TABLE + buffer_num*4 + 2] = -1;
+
+  //Changing state of processes waiting
+  alias iter R4;
+  iter = 0;
+  while(iter<16) do
+    if ( ([PROCESS_TABLE + iter*16 + 4] == WAIT_BUFFER) && ([PROCESS_TABLE + iter*16 + 5] == buffer_num) ) then
+      [PROCESS_TABLE + iter*16 + 4] = READY;
+      [PROCESS_TABLE + iter*16 + 5] = -1;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  return;
+endif;
+
 //Acquire disk
 if (functionNum==3) then
   // While disk is in use
@@ -19,8 +58,11 @@ if (functionNum == 4) then
 
   //Checking if inode is locked
   while ([FILE_STATUS_TABLE + inode_index*4] != -1) do
+    print "2 ";
+    breakpoint;
     [PROCESS_TABLE + currentPID*16 + 4]=WAIT_FILE;
     [PROCESS_TABLE + currentPID*16 + 5]=inode_index;
+    breakpoint;
     multipush(R1, R2,R3);
     call MOD_5;
     multipop(R1, R2,R3);

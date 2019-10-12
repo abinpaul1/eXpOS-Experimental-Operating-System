@@ -20,6 +20,7 @@ childPID = R0;
 multipop(R0,R1);
 
 
+
 if (childPID == -1) then
   //Return value : -1
   [ [PAGE_TABLE_BASE + childPID*20 + 2*((userSP-1)/512) ]*512 + ((userSP-1)%512) ] = -1;
@@ -78,20 +79,26 @@ free_page = R0;
 multipop(R0, R1, R2);
 [PROCESS_TABLE + childPID*16 + 11] = free_page;
 
+alias child_pt_entry R10;
+alias parent_pt_entry R11;
+
+child_pt_entry = PROCESS_TABLE + childPID*16;
+parent_pt_entry = PROCESS_TABLE + parentPID*16;
+
 //Initializing process table of child process
 //Tick :  0
-[PROCESS_TABLE + childPID*16 + 0] = 0;
+[child_pt_entry + 0] = 0;
 //Setting PPID
-[PROCESS_TABLE + childPID*16 + 2] = parentPID;
+[child_pt_entry + 2] = parentPID;
 //Setting mode,kernel stack pointer
-[PROCESS_TABLE + childPID*16 + 9] = 0;
-[PROCESS_TABLE + childPID*16 + 12] = 0;
+[child_pt_entry + 9] = 0;
+[child_pt_entry + 12] = 0;
 //Copying USERID, SWAP FLAG, inode_index, user area swap status, uptr
-[PROCESS_TABLE + childPID*16 + 3] = [PROCESS_TABLE + parentPID*16 + 3];
-[PROCESS_TABLE + childPID*16 + 6] = [PROCESS_TABLE + parentPID*16 + 6];
-[PROCESS_TABLE + childPID*16 + 7] = [PROCESS_TABLE + parentPID*16 + 7];
-[PROCESS_TABLE + childPID*16 + 10] = [PROCESS_TABLE + parentPID*16 + 10];
-[PROCESS_TABLE + childPID*16 + 13] = [PROCESS_TABLE + parentPID*16 + 13];
+[child_pt_entry + 3] = [parent_pt_entry + 3];
+[child_pt_entry + 6] = [parent_pt_entry + 6];
+[child_pt_entry + 7] = [parent_pt_entry + 7];
+[child_pt_entry + 10] = [parent_pt_entry + 10];
+[child_pt_entry + 13] = [parent_pt_entry + 13];
 
 
 //Copying per process resource table
@@ -99,16 +106,23 @@ alias iter R4;
 iter = 0;
 while (iter<8) do
   alias rt_entry_child R5;
-  rt_entry_child = [PROCESS_TABLE + childPID*16 + 11]*512 + 496 + 2*iter;
+  rt_entry_child = [child_pt_entry + 11]*512 + 496 + 2*iter;
 
-  [rt_entry_child] = [[PROCESS_TABLE + parentPID*16 + 11]*512 + 496 + 2*iter];
-  [rt_entry_child + 1] = [[PROCESS_TABLE + parentPID*16 + 11]*512 + 496 + 2*iter + 1];
+  [rt_entry_child] = [[parent_pt_entry + 11]*512 + 496 + 2*iter];
+  [rt_entry_child + 1] = [[parent_pt_entry + 11]*512 + 496 + 2*iter + 1];
 
   if ( [rt_entry_child] == SEMAPHORE) then
     //Incrementing process count entry in semaphore table
     alias sem_table_index R6;
     sem_table_index = [rt_entry_child + 1];
     [SEMAPHORE_TABLE + sem_table_index + 1] = [SEMAPHORE_TABLE + sem_table_index + 1] + 1;
+  endif;
+
+  if ( [rt_entry_child] == FILE) then
+    alias open_tab_index R6;
+    open_tab_index = [rt_entry_child + 1];
+    //Incrementing open instance count
+    [OPEN_FILE_TABLE + open_tab_index*4 + 1] = [OPEN_FILE_TABLE + open_tab_index*4 + 1] + 1;
   endif;
   iter = iter + 1;
 endwhile;
@@ -148,24 +162,24 @@ endwhile;
 [page_table_child + 19] = [PTBR + 19];
 
 //Storing value in BP register on top of the child kernel stack
-[PROCESS_TABLE + childPID*16 + 12] = [PROCESS_TABLE + childPID*16 + 12] + 1;
-[[PROCESS_TABLE + childPID*16 + 11]*512 + [PROCESS_TABLE + childPID*16 + 12]] = BP;
+[child_pt_entry + 12] = [child_pt_entry + 12] + 1;
+[[child_pt_entry + 11]*512 + [child_pt_entry + 12]] = BP;
 
 //Setting return value of child process
 alias childUserSP R6;
-childUserSP = [PROCESS_TABLE + childPID*16 + 13];
+childUserSP = [child_pt_entry + 13];
 [ [page_table_child + 2*((childUserSP-1)/512) ]*512 + ((childUserSP-1)%512) ] = 0;
 
 //Setting return value of parent process
 [ [PTBR + 2*((userSP-1)/512) ]*512 + ((userSP-1)%512) ] = childPID;
 
 //Setting state of child process
-[PROCESS_TABLE + childPID*16 + 4] = CREATED;
+[child_pt_entry + 4] = CREATED;
 
 //Mode flag of parent process to 0
-[PROCESS_TABLE + parentPID*16 + 9] = 0;
+[parent_pt_entry + 9] = 0;
 //SP to user stack
-SP = [PROCESS_TABLE + parentPID*16 + 13];
+SP = [parent_pt_entry + 13];
 //Returning to parent process
 
 ireturn;

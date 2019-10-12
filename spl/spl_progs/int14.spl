@@ -30,7 +30,7 @@ if (sys_call_num==19) then
   res_table_entry = [PROCESS_TABLE + currentPID*16 + 11]*512 + 496 + 2*sem_id;
 
 
-  if ( (sem_id<0) || (sem_id>7) || ([res_table_entry]==-1) ) then
+  if ( (sem_id<0) || (sem_id>7) || ([res_table_entry]!=SEMAPHORE) ) then
     SP = userSP;
     //Mode field reset to 0
     [PROCESS_TABLE + currentPID*16 + 9] = 0;
@@ -79,7 +79,7 @@ if (sys_call_num==20) then
   //Setting mode flag to 20
   [PROCESS_TABLE + currentPID*16 + 9] = 20;
 
-  if ( (sem_id<0) || (sem_id>7) || ([res_table_entry]==-1) ) then
+  if ( (sem_id<0) || (sem_id>7) || ([res_table_entry]!=SEMAPHORE) ) then
     SP = userSP;
     //Mode field reset to 0
     [PROCESS_TABLE + currentPID*16 + 9] = 0;
@@ -111,7 +111,7 @@ if (sys_call_num==20) then
     iter = 0;
     while(iter<16) do
       if ( [PROCESS_TABLE + iter*16 + 4] == WAIT_SEMAPHORE ) then
-        if ( [PROCESS_TABLE + iter*16 + 5] == sem_id) then
+        if ( [PROCESS_TABLE + iter*16 + 5] == sem_table_index) then
           [PROCESS_TABLE + iter*16 + 4] = READY;
           [PROCESS_TABLE + iter*16 + 5] = -1;
         endif;

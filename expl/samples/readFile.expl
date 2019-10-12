@@ -1,0 +1,23 @@
+decl
+    int temp, filedis, a;
+    string filename, data;
+enddecl
+int main()
+{
+begin
+    temp = exposcall("Write",-2,"File Name");
+    temp = exposcall("Read",-1,filename);
+    filedis = exposcall("Open", filename);
+    if (filedis!=-1) then
+      a = 0;
+      while(a != -2)  do
+          a = exposcall("Read",filedis,data);
+          temp = exposcall("Write",-2,data);
+      endwhile;
+      temp = exposcall("Close",filedis);
+    else
+      temp = exposcall("Write",-2,"Not data file");
+    endif;
+    return 0;
+end
+}
