@@ -1,0 +1,36 @@
+int main()
+{
+	decl
+		string fileName1,fileName2,word;
+		int temp1,temp2,fd1,fd2;
+	
+	enddecl
+	begin
+		
+		temp1 = exposcall("Read",-1,fileName1);
+		temp2 = exposcall("Read",-1,fileName2);
+		//fileName1 = "numbers.dat";
+		//fileName2 = "cat.dat";
+
+		fd1 = exposcall("Open",fileName1);
+		fd2 = exposcall("Open",fileName2);
+		if(fd1>=0) then
+			if(fd2>=0) then
+				while(1==1) do
+				
+					temp1 = exposcall("Read",fd1,word);
+					if(temp1==-2) then
+						break;
+					endif;
+					temp2 = exposcall("Write",fd2,word);
+				endwhile;
+			endif;
+			
+		endif;
+		
+		temp1 = exposcall("Close",fd1);
+		temp2 = exposcall("Close",fd2);		
+				
+		return 0;
+	end
+}

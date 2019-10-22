@@ -1,10 +1,9 @@
 alias functionNum R1;
 
-//Buffered read
-if (functionNum==2) then
+//Buffered read/write
+if (functionNum==1 || functionNum==2) then
   alias disk_block_num R2;
   alias offset R3;
-  alias word_addr R4;
 
   alias buffer_num R5;
   buffer_num = disk_block_num % 4;
@@ -48,8 +47,17 @@ if (functionNum==2) then
 
   endif;
 
-  //Copying the contents into variable
-  [word_addr] = [ (71 + buffer_num)*512 + offset ];
+  if (functionNum==2) then
+    //Copying the contents into variable
+    alias word_addr R4;
+    [word_addr] = [ (71 + buffer_num)*512 + offset ];
+  else
+    alias word R4;
+    //Copying contents of the word into the buffer
+    [ (71 + buffer_num)*512 + offset ] =word;
+    //Marking buffer as dirty
+    [BUFFER_TABLE + buffer_num*4 + 1] = 1;
+  endif;
 
   //Releasing buffer
   multipush(R0,R1,R2,R3,R4,R5);
@@ -99,12 +107,12 @@ if (functionNum==3) then
   //If the file is of type EXEC
   if ( [INODE_TABLE + inode_index*16] == EXEC) then
     //Release inode
-    multipush(R0,R1,R2,R3,R4);
+    multipush(R1,R2,R3,R4);
     R1 = 5;
     R2 = [SYSTEM_STATUS_TABLE + 1];
     R3 = inode_index;
     call MOD_0;
-    multipop(R0,R1,R2,R3,R4);
+    multipop(R1,R2,R3,R4);
     R0 = -1;
     return;
   endif;
@@ -184,7 +192,7 @@ if (functionNum==4) then
 
     //Invalidating the open file table entry
     [OPEN_FILE_TABLE + open_tab_index*4] = -1;
-    [OPEN_FILE_TABLE + open_tab_index*4 + 1] = -1;
+    [OPEN_FILE_TABLE + open_tab_index*4 + 1] = 0;
     [OPEN_FILE_TABLE + open_tab_index*4 + 2] = -1;
 
   endif;

@@ -4,49 +4,175 @@
 alias userSP R0;
 userSP = SP;
 
+alias ret_addr R2;
+ret_addr = [PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512 ;
+
 // SP value is stored in UPTR field of process table
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] = SP;
 
 // Changing to kernel stack
 SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11]*512 - 1;
 
+alias fileDesc R3;
+fileDesc = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
 
-alias physicalPageNum R1;
-alias offset R2;
-alias fileDescPhysicalAddr R3;
-// userSP - 4 contains argument 1 ie, logical address of filedesc
-// Finding physical address
-physicalPageNum = [PTBR + 2*( (userSP - 4)/512 )];
-offset = (userSP - 4)%512;
-fileDescPhysicalAddr = physicalPageNum*512 + offset;
-alias fileDesc R4;
-fileDesc = [fileDescPhysicalAddr];
-if (fileDesc!= -2)
-then
-    //userSP -1 stores logical adress of return value
-    alias physicalAddrOfRetVal R5;
-    physicalAddrOfRetVal = [PTBR + 2* ((userSP-1)/512)]*512 + ((userSP-1)%512);
-    [physicalAddrOfRetVal] = -1;
+if (fileDesc == -2) then
+  // userSP - 3 contains argument 2 -- word to be dispalyed -- logical address
+  alias word R4;
+  word = [[PTBR + 2* ((userSP-3)/512)]*512 + ((userSP-3)%512)];
+
+  multipush(R0, R1, R2, R3, R4);
+  //R1- function call number of terminal write
+  //R0 will have return value after call
+  R1 = 3;
+  R2 = [SYSTEM_STATUS_TABLE + 1];
+  R3 = word;
+  call MOD_4;
+  multipop(R0, R1, R2, R3, R4);
 else
-    // userSP - 3 contains argument 2 -- word to be dispalyed -- logical address
-    alias word R5;
-    word = [[PTBR + 2* ((userSP-3)/512)]*512 + ((userSP-3)%512)];
 
-    multipush(R0, R1, R2, R3, R4, R5);
-    //R1- function call number of terminal write
-    //R0 will have return value after call
-    R1 = 3;
+  alias res_table_entry R4;
+  res_table_entry = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11]*512 + 496 + 2*fileDesc;
+
+  //If file descriptor is invalid or if Resource identifier field does not indicate a FILE--0
+  if ( (fileDesc<0) || (fileDesc>7) || ([res_table_entry]!=0) ) then
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+    //Storing return value in stack
+    [ret_addr] = -1;
+    ireturn;
+  endif;
+
+  alias open_tab_index R5;
+  open_tab_index = [res_table_entry + 1];
+
+  alias inode_index R6;
+  inode_index = [OPEN_FILE_TABLE + open_tab_index*4];
+
+  //If current user is not root
+  if ([PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 3]!=ROOT) then
+    //If current user does not own the file and permission is exclusive
+    if ( ([INODE_TABLE + inode_index*16 + 3] != [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 3]) && ([INODE_TABLE + inode_index*16 + 4] == EXCLUSIVE) ) then
+      SP = userSP;
+      //Mode field reset to 0
+      [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+      //Storing return value in stack
+      [ret_addr] = -3;
+      ireturn;
+    endif;
+  endif;
+
+  //Acquiring inode
+  multipush(R0,R1,R2,R3,R5,R6);
+  R1 = 4;
+  R2 = [SYSTEM_STATUS_TABLE + 1];
+  R3 = inode_index;
+  call MOD_0;
+  R7 = R0; //R7 temporarily holds return value
+  multipop(R0,R1,R2,R3,R5,R6);
+
+  //If Acquiring failed, return -1
+  if (R7 == -1) then
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+    //Storing return value in stack
+    [ret_addr] = -1;
+    ireturn;
+  endif;
+
+  alias lseek_pos R7;
+  lseek_pos = [OPEN_FILE_TABLE + open_tab_index*4 + 2];
+
+  if (lseek_pos == MAX_FILE_SIZE) then
+    //Releasing inode
+    multipush(R0,R1,R2,R3,R5,R6,R7);
+    R1 = 5;
     R2 = [SYSTEM_STATUS_TABLE + 1];
-    R3 = word;
-    call MOD_4;
-    multipop(R0, R1, R2, R3, R4, R5);
+    R3 = inode_index;
+    call MOD_0;
+    multipop(R0,R1,R2,R3,R5,R6,R7);
 
-    alias physicalAddrOfRetVal R6;
-    physicalAddrOfRetVal = [PTBR + 2* ((userSP-1)/512)]*512 + ((userSP-1)%512);
-    [physicalAddrOfRetVal] = 0;
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+    //Storing return value in stack
+    [ret_addr] = -2;
+    ireturn;
+  endif;
+
+  //If the Lseek position is multiple of 512 and the same as File size
+  if ( (lseek_pos%512==0) && (lseek_pos == [INODE_TABLE + inode_index*16 + 2])) then
+    alias free_block R8;
+    //Calling get free block
+    multipush(R0,R1,R2,R3,R5,R6,R7);
+    R1 = 3;
+    call MOD_2;
+    free_block = R0;
+    multipop(R0,R1,R2,R3,R5,R6,R7);
+
+    //If no free disk block
+    if (free_block == -1) then
+      //Releasing inode
+      multipush(R0,R1,R2,R3,R5,R6,R7,R8);
+      R1 = 5;
+      R2 = [SYSTEM_STATUS_TABLE + 1];
+      R3 = inode_index;
+      call MOD_0;
+      multipop(R0,R1,R2,R3,R5,R6,R7,R8);
+
+      SP = userSP;
+      //Mode field reset to 0
+      [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+      //Storing return value in stack
+      [ret_addr] = -2;
+      ireturn;
+    endif;
+
+    //Updating inode table with new block
+    [INODE_TABLE + inode_index*16 + 8 + (lseek_pos/512)] = free_block;
+  endif;
+
+  // Block index = lseek/512
+  alias disk_block_num R8;
+  disk_block_num = [INODE_TABLE + inode_index*16 + 8 + (lseek_pos/512)];
+  alias offset R9;
+  offset = lseek_pos%512;
+
+  alias word R10;
+  word = [[PTBR + 2* ((userSP-3)/512)]*512 + ((userSP-3)%512)];
+  //Calling buffered write
+  multipush(R0,R1,R2,R3,R4,R5,R6,R7,R8,R9);
+  R1 = 1;
+  R2 = disk_block_num;
+  R3 = offset;
+  R4 = word;
+  call MOD_3;
+  multipop(R0,R1,R2,R3,R4,R5,R6,R7,R8,R9);
+
+  //If lseek = file size
+  if (lseek_pos == [INODE_TABLE + inode_index*16 + 2]) then
+  //Incrementing file size in inode_table, root file
+    [INODE_TABLE + inode_index*16 + 2] = [INODE_TABLE + inode_index*16 + 2] + 1;
+    [ROOT_FILE + inode_index*8 + 2] = [ROOT_FILE + inode_index*8 + 2] + 1;
+  endif;
+
+  //Incrementing lseek_pos
+  [OPEN_FILE_TABLE + open_tab_index*4 + 2] = [OPEN_FILE_TABLE + open_tab_index*4 + 2] + 1;
+
+  //Releasing inode
+  multipush(R0,R1,R2,R3,R5,R6,R7,R8,R9);
+  R1 = 5;
+  R2 = [SYSTEM_STATUS_TABLE + 1];
+  R3 = inode_index;
+  call MOD_0;
+  multipop(R0,R1,R2,R3,R5,R6,R7,R8,R9);
 endif;
 
 SP = userSP;
 // Mode field to 0
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+//Storing return value in stack
+[ret_addr] = 0;
 ireturn;

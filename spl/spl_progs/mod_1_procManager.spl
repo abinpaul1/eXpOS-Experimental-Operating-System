@@ -1,4 +1,4 @@
-//Get PCB entry - 1, Free User Area Page-2 , Exit Process-3 , Free Page Table-4
+//Get PCB entry - 1, Free User Area Page-2 , Exit Process-3 , Free Page Table-4, Kill all -5
 
 alias functionNum R1;
 alias currentPID R2;
@@ -69,21 +69,21 @@ endif;
 
 //Exit Process
 if (functionNum==3) then
-  currentPID = [SYSTEM_STATUS_TABLE + 1];
-  if ([PROCESS_TABLE + currentPID*16 + 9] != 9) then
+  alias kill_pid R2;
+  if ([PROCESS_TABLE + kill_pid*16 + 9] != 9) then
     alias iter R3;
     iter = 0;
     //Wake up all processes waiting for the current process
     while(iter<16) do
       if ( [PROCESS_TABLE + iter*16 + 4] == WAIT_PROCESS ) then
-        if ( [PROCESS_TABLE + iter*16 + 5] == currentPID) then
+        if ( [PROCESS_TABLE + iter*16 + 5] == kill_pid) then
           [PROCESS_TABLE + iter*16 + 4] = READY;
           [PROCESS_TABLE + iter*16 + 5] = -1;
         endif;
       endif;
 
       //Set the children of the process as Orphan
-      if ( [PROCESS_TABLE + iter*16 + 2] == currentPID ) then
+      if ( [PROCESS_TABLE + iter*16 + 2] == kill_pid ) then
         [PROCESS_TABLE + iter*16 + 2] = -1;
       endif;
 
@@ -94,19 +94,19 @@ if (functionNum==3) then
   //Invoking free Page Table
   multipush(R0, R1, R2);
   R1 = 4;
-  R2 = currentPID;
+  R2 = kill_pid;
   call  MOD_1;
   multipop(R0, R1, R2);
 
   //Invoking free user area page
   multipush(R0, R1, R2);
   R1 = 2;
-  R2 = currentPID;
+  R2 = kill_pid;
   call  MOD_1;
   multipop(R0, R1, R2);
 
   //Setting state as TERMINATED
-  [PROCESS_TABLE + currentPID*16 +4] = TERMINATED;
+  [PROCESS_TABLE + kill_pid*16 +4] = TERMINATED;
   return;
 endif;
 
@@ -156,5 +156,55 @@ if (functionNum==4) then
     [disk_map_proc + iter] = -1;
     iter = iter + 1;
   endwhile;
+  return;
+endif;
+
+//Kill all
+if (functionNum==5) then
+  alias iter R3;
+
+  iter = 0;
+  //Locking all files
+  while(iter<60) do
+    if ( [INODE_TABLE + iter*16 + 1] != -1) then
+      //Acquire inode
+      multipush(R0,R1,R2,R3);
+      R1 = 4;
+      R2 = currentPID;
+      R3 = iter;
+      call MOD_0;
+      multipop(R0,R1,R2,R3);
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  //Looping through process (pid = 2 to MAX_PROC_NUM-1)
+  iter = 2;
+  while (iter < MAX_PROC_NUM) do
+    if ( (iter!= currentPID) && [PROCESS_TABLE + iter*16 + 4]!=TERMINATED) then
+      multipush(R0, R1, R2, R3);
+      R1 = 3;
+      R2 = iter;
+      call MOD_1;
+      multipop(R0, R1, R2, R3);
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  iter = 0;
+  //Unlocking all valid entry in inode table
+  while(iter<60) do
+    if ( [INODE_TABLE + iter*16 + 1] != -1) then
+      //Release inode
+      multipush(R0,R1,R2,R3);
+      R1 = 5;
+      R2 = currentPID;
+      R3 = iter;
+      call MOD_0;
+      multipop(R0,R1,R2,R3);
+    endif;
+    iter = iter + 1;
+  endwhile;
+
   return;
 endif;

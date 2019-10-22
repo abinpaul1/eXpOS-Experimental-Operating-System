@@ -58,11 +58,8 @@ if (functionNum == 4) then
 
   //Checking if inode is locked
   while ([FILE_STATUS_TABLE + inode_index*4] != -1) do
-    print "2 ";
-    breakpoint;
     [PROCESS_TABLE + currentPID*16 + 4]=WAIT_FILE;
     [PROCESS_TABLE + currentPID*16 + 5]=inode_index;
-    breakpoint;
     multipush(R1, R2,R3);
     call MOD_5;
     multipop(R1, R2,R3);

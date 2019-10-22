@@ -65,6 +65,26 @@ if (functionNum == 2) then
   return;
 endif;
 
+//Get free block
+if (functionNum == 3) then
+  alias iter R2;
+  iter = DISK_FREE_AREA;
+  while (iter<DISK_SWAP_AREA) do
+    //If a block is free
+    if ([DISK_FREE_LIST + iter] == 0) then
+      [DISK_FREE_LIST + iter] = 1;
+      //Returning the block number
+      R0 = iter;
+      return;
+    endif;
+    iter = iter + 1;
+  endwhile;
+  //No free blocks
+  R0 = -1;
+  return;
+endif;
+
+
 //Release block
 if (functionNum == 4) then
     alias blockNum R2;

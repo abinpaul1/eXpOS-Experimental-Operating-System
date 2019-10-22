@@ -5,12 +5,11 @@
 alias userSP R0;
 userSP=SP;
 
-alias currentPID R2;
-currentPID = [SYSTEM_STATUS_TABLE+1];
+alias ret_addr R2;
+ret_addr = [PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512;
 
-[PROCESS_TABLE + currentPID*16 + 13] = SP;
-SP = [PROCESS_TABLE + currentPID*16 + 11]*512 - 1;
-
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11]*512 - 1;
 
 alias fileDesc R3;
 fileDesc = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
@@ -34,22 +33,22 @@ else
   if ( (fileDesc<0) || (fileDesc>7) ) then
     SP = userSP;
     //Mode field reset to 0
-    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
     //Storing return value in stack
-    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+    [ret_addr] = -1;
     ireturn;
   endif;
 
   alias res_table_entry R4;
-  res_table_entry = [PROCESS_TABLE + currentPID*16 + 11]*512 + 496 + 2*fileDesc;
+  res_table_entry = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11]*512 + 496 + 2*fileDesc;
 
   //If the Resource identifier field does not indicate a FILE--0
   if ( [res_table_entry]!=0 ) then
     SP = userSP;
     //Mode field reset to 0
-    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
     //Storing return value in stack
-    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+    [ret_addr] = -1;
     ireturn;
   endif;
 
@@ -62,7 +61,7 @@ else
   //Acquiring inode
   multipush(R0,R1,R2,R3,R5,R6);
   R1 = 4;
-  R2 = currentPID;
+  R2 = [SYSTEM_STATUS_TABLE+1];
   R3 = inode_index;
   call MOD_0;
   R7 = R0; //R7 temporarily holds return value
@@ -72,9 +71,9 @@ else
   if (R7 == -1) then
     SP = userSP;
     //Mode field reset to 0
-    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
     //Storing return value in stack
-    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+    [ret_addr] = -1;
     ireturn;
   endif;
 
@@ -85,7 +84,7 @@ else
   alias word_logical R8;
   word_logical = [[PTBR + 2* ((userSP-3)/512)]*512 + ((userSP-3)%512)];
   alias word_addr R9;
-  word_addr = [PAGE_TABLE_BASE + currentPID*20 + 2*(word_logical/512)]*512 + (word_logical%512);
+  word_addr = [PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2*(word_logical/512)]*512 + (word_logical%512);
 
 
   //If file corresponds to root file
@@ -95,16 +94,16 @@ else
       //Releasing inode
       multipush(R0,R1,R2,R3,R5,R6,R7,R8,R9);
       R1 = 5;
-      R2 = currentPID;
+      R2 = [SYSTEM_STATUS_TABLE+1];
       R3 = inode_index;
       call MOD_0;
       multipop(R0,R1,R2,R3,R5,R6,R7,R8,R9);
 
       SP = userSP;
       //Mode field reset to 0
-      [PROCESS_TABLE + currentPID*16 + 9] = 0;
+      [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
       //Storing return value in stack
-      [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -2;
+      [ret_addr] = -2;
       ireturn;
     endif;
     //Reading from lseek position in memory copy of root file
@@ -118,16 +117,16 @@ else
       //Releasing inode
       multipush(R0,R1,R2,R3,R5,R6,R7,R8,R9);
       R1 = 5;
-      R2 = currentPID;
+      R2 = [SYSTEM_STATUS_TABLE+1];
       R3 = inode_index;
       call MOD_0;
       multipop(R0,R1,R2,R3,R5,R6,R7,R8,R9);
 
       SP = userSP;
       //Mode field reset to 0
-      [PROCESS_TABLE + currentPID*16 + 9] = 0;
+      [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
       //Storing return value in stack
-      [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -2;
+      [ret_addr] = -2;
       ireturn;
     endif;
 
@@ -153,7 +152,7 @@ else
   //Releasing inode
   multipush(R0,R1,R2,R3,R5,R6,R7,R8,R9);
   R1 = 5;
-  R2 = currentPID;
+  R2 = [SYSTEM_STATUS_TABLE+1];
   R3 = inode_index;
   call MOD_0;
   multipop(R0,R1,R2,R3,R5,R6,R7,R8,R9);
@@ -164,5 +163,5 @@ endif;
 //SP to user stack
 SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
 //Storing return value in stack
-[[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = 0;
+[ret_addr] = 0;
 ireturn;
