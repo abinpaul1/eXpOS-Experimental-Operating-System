@@ -1,10 +1,13 @@
 // INIT Code
 loadi(65,7);
-loadi(66,8);
 
 // Library loading
 loadi(63,13);
 loadi(64,14);
+
+//Shell program loading
+loadi(67,9);
+loadi(68,10);
 
 //Exception handler loading
 loadi(2, 15);
@@ -50,6 +53,10 @@ loadi(23,36);
 loadi(24,37);
 loadi(25,38);
 
+//INT 12 loading
+loadi(26,39);
+loadi(27,40);
+
 //INT 13 loading
 loadi(28,41);
 loadi(29,42);
@@ -61,6 +68,14 @@ loadi(31,44);
 //INT 15 loading
 loadi(32,45);
 loadi(33,46);
+
+//INT 16 loading
+loadi(34,47);
+loadi(35,48);
+
+//INT 17 loading
+loadi(36,49);
+loadi(37,50);
 
 //MOD 0 loading
 loadi(40,53);
@@ -144,7 +159,7 @@ endwhile;
 
 //Initialize memory free list
 iter = 0;
-while (iter<83) do
+while (iter<81) do
   [MEMORY_FREE_LIST + iter] = 1;
   iter = iter + 1;
 endwhile;
@@ -153,34 +168,19 @@ while (iter<128) do
   iter = iter + 1;
 endwhile;
 
-// Initialize MEM_FREE_COUNT to free pages -- (128-83 = 45)
-[SYSTEM_STATUS_TABLE + 2] = 45;
+// Initialize MEM_FREE_COUNT to free pages -- (128-81 = 47)
+[SYSTEM_STATUS_TABLE + 2] = 47;
 //initialize WAIT_MEM_COUNT to 0
 [SYSTEM_STATUS_TABLE + 3] = 0;
 
 //Setting terminal as free
 [TERMINAL_STATUS_TABLE]=0;
 
-//Initializing disk map table entries of init -- pid =1
-alias disk_map_entry R1;
-disk_map_entry = DISK_MAP_TABLE + 10;
-
-[disk_map_entry] = -1;
-[disk_map_entry + 1] = -1;
-[disk_map_entry + 2] = -1;
-[disk_map_entry + 3] = -1;
-[disk_map_entry + 4] = 7;
-[disk_map_entry + 5] = 8;
-[disk_map_entry + 6] = -1;
-[disk_map_entry + 7] = -1;
-[disk_map_entry + 8] = -1;
-[disk_map_entry + 9] = -1;
-
 //Invalidating per process resource table of INIT
 iter = 0;
 while (iter<8) do
   //Last 16 words of the User Area Page is used for per process resource table
-  [80*512 + 496 + 2*iter] = -1;
+  [77*512 + 496 + 2*iter] = -1;
   iter = iter + 1;
 endwhile;
 
@@ -195,26 +195,26 @@ PTLR = 10;
 [PTBR+3] = "0100";
 
 //Heap
-[PTBR+4] = 78;
-[PTBR+5] = "0110";
-[PTBR+6] = 79;
-[PTBR+7] = "0110";
+[PTBR+4] = -1;
+[PTBR+5] = "0000";
+[PTBR+6] = -1;
+[PTBR+7] = "0000";
 
 //Code
 [PTBR+8] = 65;
 [PTBR+9] = "0100";
-[PTBR+10] = 66;
-[PTBR+11] = "0100";
+[PTBR+10] = -1;
+[PTBR+11] = "0000";
 [PTBR+12] = -1;
 [PTBR+13] = "0000";
 [PTBR+14] = -1;
 [PTBR+15] = "0000";
 
 //Stack
-[PTBR+16] = 76;
+[PTBR+16] = 66;
 [PTBR+17] = "0110";
-[PTBR+18] = 77;
-[PTBR+19] = "0110";
+[PTBR+18] = -1;
+[PTBR+19] = "0000";
 
 
 alias PROC_TAB R2;
@@ -225,7 +225,7 @@ PROC_TAB = PROCESS_TABLE + 16;
 //Setting user id of init to root
 [PROC_TAB + 3] = 1;
 //Assigning UArea page number
-[PROC_TAB + 11] = 80;
+[PROC_TAB + 11] = 77;
 //State is CREATED as idle process is going to be scheduled first
 [PROC_TAB + 4] = CREATED;
 //Setting UPTR to stack logical address
@@ -237,8 +237,79 @@ PROC_TAB = PROCESS_TABLE + 16;
 //Setting PTLR
 [PROC_TAB + 15] = 10;
 //Stack pointer to entry point in code header
-[76*512] = [65*512 + 1];
+[66*512] = [65*512 + 1];
 
+
+//Setting PTBR for pid = 2, shell process
+PTBR = PAGE_TABLE_BASE+40;
+PTLR = 10;
+
+// Shared Library
+[PTBR+0] = 63;
+[PTBR+1] = "0100";
+[PTBR+2] = 64;
+[PTBR+3] = "0100";
+
+//Heap
+[PTBR+4] = -1;
+[PTBR+5] = "0000";
+[PTBR+6] = -1;
+[PTBR+7] = "0000";
+
+//Code
+[PTBR+8] = 67;
+[PTBR+9] = "0100";
+[PTBR+10] = 68;
+[PTBR+11] = "0100";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+//Stack
+[PTBR+16] = 78;
+[PTBR+17] = "0110";
+[PTBR+18] = 79;
+[PTBR+19] = "0110";
+
+
+PROC_TAB = PROCESS_TABLE + 32;
+// Process table entry for shell program
+//pid = 2
+[PROC_TAB + 1] = 2;
+//ppid = 1
+[PROC_TAB + 2] = 1;
+//Setting user id of init to root
+[PROC_TAB + 3] = ROOT;
+//Assigning UArea page number
+[PROC_TAB + 11] = 80;
+//State is TERMINATED
+[PROC_TAB + 4] = TERMINATED;
+//Setting UPTR to stack logical address
+[PROC_TAB + 13] = 8*512;
+//Setting KPTR to 0
+[PROC_TAB + 12] = 0;
+//Setting PTBR
+[PROC_TAB + 14] = PAGE_TABLE_BASE + 40;
+//Setting PTLR
+[PROC_TAB + 15] = 10;
+//Stack pointer to entry point in code header
+[78*512] = [67*512 + 1];
+
+//Initializing disk map table entries of shell -- pid =2
+alias disk_map_entry R1;
+disk_map_entry = DISK_MAP_TABLE + 20;
+
+[disk_map_entry] = -1;
+[disk_map_entry + 1] = -1;
+[disk_map_entry + 2] = -1;
+[disk_map_entry + 3] = -1;
+[disk_map_entry + 4] = 9;
+[disk_map_entry + 5] = 10;
+[disk_map_entry + 6] = -1;
+[disk_map_entry + 7] = -1;
+[disk_map_entry + 8] = -1;
+[disk_map_entry + 9] = -1;
 
 //Setting all other process state as TERMINATED
 iter = 2;
