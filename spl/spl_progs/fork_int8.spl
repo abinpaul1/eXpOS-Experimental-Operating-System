@@ -115,7 +115,7 @@ while (iter<8) do
     //Incrementing process count entry in semaphore table
     alias sem_table_index R6;
     sem_table_index = [rt_entry_child + 1];
-    [SEMAPHORE_TABLE + sem_table_index + 1] = [SEMAPHORE_TABLE + sem_table_index + 1] + 1;
+    [SEMAPHORE_TABLE + sem_table_index*4 + 1] = [SEMAPHORE_TABLE + sem_table_index*4 + 1] + 1;
   endif;
 
   if ( [rt_entry_child] == FILE) then

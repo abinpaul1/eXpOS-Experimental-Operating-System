@@ -1,13 +1,12 @@
 // Idle Code
 loadi(69,11);
-loadi(70,12);
 
 //MOD 7 loading
 loadi(54, 67);
 loadi(55, 68);
 
-//Setting SP
-SP = 82*512 - 1;
+//Setting SP to kernel stack
+SP = 76*512 - 1;
 
 call BOOT_MODULE;
 
@@ -30,15 +29,15 @@ PTLR = 10;
 //Code
 [PTBR+8] = 69;
 [PTBR+9] = "0100";
-[PTBR+10] = 70;
-[PTBR+11] = "0100";
+[PTBR+10] = -1;
+[PTBR+11] = "0000";
 [PTBR+12] = -1;
 [PTBR+13] = "0000";
 [PTBR+14] = -1;
 [PTBR+15] = "0000";
 
 //Stack
-[PTBR+16] = 81;
+[PTBR+16] = 70;
 [PTBR+17] = "0110";
 [PTBR+18] = -1;
 [PTBR+19] = "0000";
@@ -49,7 +48,7 @@ PROC_TAB = PROCESS_TABLE;
 //pid = 0
 [PROC_TAB + 1] = 0;
 //Assigning UArea page number
-[PROC_TAB + 11] = 82;
+[PROC_TAB + 11] = 76;
 //State is RUNNING
 [PROC_TAB + 4] = RUNNING;
 //Setting UPTR to stack logical address
@@ -61,7 +60,7 @@ PROC_TAB = PROCESS_TABLE;
 //Setting PTLR
 [PROC_TAB + 15] = 10;
 //Setting entry point IP Value from header to stack top
-[81 * 512] = [69*512 + 1];
+[70 * 512] = [69*512 + 1];
 
 
 //Setting machine registers for scheduling idle process

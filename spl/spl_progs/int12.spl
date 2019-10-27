@@ -1,0 +1,60 @@
+alias userSP R0;
+userSP = SP;
+
+//Setting mode flag to 28
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 28;
+
+// SP value is stored in UPTR field of process table
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] = SP;
+
+// Changing to kernel stack
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11]*512 - 1;
+
+alias ret_phy_addr R1;
+ret_phy_addr = [PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512;
+
+// If current process is not shell
+if ([SYSTEM_STATUS_TABLE+1] != 2) then
+  SP = userSP;
+  //Mode field reset to 0
+  [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+  //Storing return value in stack
+  [ret_phy_addr] = -1;
+  ireturn;
+endif;
+
+//Calling kill all function
+multipush(R0,R1);
+R1 = 5;
+R2 = [SYSTEM_STATUS_TABLE + 1];
+call MOD_1;
+multipop(R0,R1);
+
+//Set the state of the current process-shell
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE +1]*16 + 4] = TERMINATED;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE +1]*16 + 5] = -1;
+
+//Setting entry point IP Value from header to stack top
+alias entry_ip R2;
+entry_ip = [[PAGE_TABLE_BASE + 20*[SYSTEM_STATUS_TABLE+1] + 8]*512 + 1];
+
+//Placing entry_ip on top of stack
+[[PAGE_TABLE_BASE + 20*[SYSTEM_STATUS_TABLE+1] + 16]*512] = entry_ip;
+
+//Waking up the Login process
+[PROCESS_TABLE + 16 + 4] = READY;
+[PROCESS_TABLE + 16 + 5] = -1;
+
+//Resetting current user id in system status table
+[SYSTEM_STATUS_TABLE] = 0;
+
+//Invoking context switch
+backup;
+call MOD_5;
+restore;
+
+//Setting mode flag to 0
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+// Stack pointer to logical address of user stack
+SP = 8*512;
+ireturn;

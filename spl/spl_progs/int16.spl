@@ -1,0 +1,293 @@
+alias userSP R0;
+userSP = SP;
+
+alias currentPID R10;
+currentPID = [SYSTEM_STATUS_TABLE + 1];
+
+// SP value is stored in UPTR field of process table
+[PROCESS_TABLE + currentPID*16 + 13] = SP;
+
+// Changing to kernel stack
+SP = [PROCESS_TABLE + currentPID*16 + 11]*512 - 1;
+
+//Extracting system call numebr from user stack -- value in userSP-5
+alias sys_call_num R1;
+sys_call_num = [[PTBR + 2*((userSP-5)/512)]*512 + (userSP-5)%512];
+
+alias ret_phy_addr R2;
+ret_phy_addr = [PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512;
+
+R3 = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+R4 = [[PTBR + 2*((userSP-3)/512)]*512 + (userSP-3)%512];
+
+alias ret_value R12;
+
+alias mode_flag_addr R13;
+mode_flag_addr = PROCESS_TABLE + currentPID*16 + 9;
+
+//Newusr
+if (sys_call_num==22) then
+  //Setting mode flag to 22
+  [mode_flag_addr] = 22;
+
+  //If current user - not root,current process - not shell
+  if ( ([SYSTEM_STATUS_TABLE]!=1) || (currentPID != 2) ) then
+    SP = userSP;
+    //Mode field reset to 0
+    [mode_flag_addr] = 0;
+    //Storing return value in stack
+    [ret_phy_addr] = -2;
+    ireturn;
+  endif;
+
+  alias user_name R3;
+  alias pwd R4;
+
+  alias iter R5;
+  alias user_tab_ind R6;
+
+  iter = 0;
+  //Checking if user exists
+  while (iter<MAX_USER_NUM) do
+    if ( [USER_TABLE + iter*2] == user_name) then
+      break;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  if (iter != MAX_USER_NUM) then
+    SP = userSP;
+    //Mode field reset to 0
+    [mode_flag_addr] = 0;
+    //Storing return value in stack
+    [ret_phy_addr] = -1;
+    ireturn;
+  endif;
+
+  iter = 0;
+  //Checking for unused entry
+  while (iter<MAX_USER_NUM) do
+    if ( [USER_TABLE + iter*2] == -1 ) then
+      break;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  //If free entry does not exist
+  if (iter == MAX_USER_NUM) then
+    SP = userSP;
+    //Mode field reset to 0
+    [mode_flag_addr] = 0;
+    //Storing return value in stack
+    [ret_phy_addr] = -3;
+    ireturn;
+  endif;
+
+  user_tab_ind = iter;
+  encrypt pwd;
+  //Adding username and pwd to user table
+  [USER_TABLE + user_tab_ind*2] = user_name;
+  [USER_TABLE + user_tab_ind*2 + 1] = pwd;
+
+
+  ret_value = 0;
+endif;
+
+
+//Remusr
+if (sys_call_num==23) then
+  //Setting mode flag to 23
+  [mode_flag_addr] = 23;
+
+  //If current user - not root,current process - not shell
+  if ( ([SYSTEM_STATUS_TABLE]!=1) || (currentPID != 2) ) then
+    SP = userSP;
+    //Mode field reset to 0
+    [mode_flag_addr] = 0;
+    //Storing return value in stack
+    [ret_phy_addr] = -2;
+    ireturn;
+  endif;
+
+  alias user_name R3;
+
+  if ( (user_name == "root") || (user_name =="kernel") ) then
+    SP = userSP;
+    //Mode field reset to 0
+    [mode_flag_addr] = 0;
+    //Storing return value in stack
+    [ret_phy_addr] = -2;
+    ireturn;
+  endif;
+
+  alias iter R4;
+  iter = 0;
+
+  alias user_tab_ind R5;
+
+  while (iter<MAX_USER_NUM) do
+    if ( [USER_TABLE + iter*2] == user_name ) then
+      break;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  //If entry not found
+  if (iter == MAX_USER_NUM) then
+    SP = userSP;
+    //Mode field reset to 0
+    [mode_flag_addr] = 0;
+    //Storing return value in stack
+    [ret_phy_addr] = -1;
+    ireturn;
+  endif;
+
+  user_tab_ind = iter;
+
+  //Checking root file
+  iter = 0;
+  while(iter<MAX_FILE_NUM) do
+    if ([ROOT_FILE + iter*8 + 3]==user_name) then
+      break;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  //If files of user is present
+  if (iter == MAX_USER_NUM) then
+    SP = userSP;
+    //Mode field reset to 0
+    [mode_flag_addr] = 0;
+    //Storing return value in stack
+    [ret_phy_addr] = -3;
+    ireturn;
+  endif;
+
+  [USER_TABLE + user_tab_ind*2] = -1;
+  [USER_TABLE + user_tab_ind*2 + 1] = -1;
+
+  ret_value = 0;
+endif;
+
+//Setpwd
+if (sys_call_num == 24) then
+  //Setting mode flag to 24
+  [mode_flag_addr] = 24;
+
+  //If current process is not shell
+  if (currentPID != 2) then
+    SP = userSP;
+    //Mode field reset to 0
+    [mode_flag_addr] = 0;
+    //Storing return value in stack
+    [ret_phy_addr] = -1;
+    ireturn;
+  endif;
+
+  alias user_name R3;
+  alias pwd R4;
+
+  alias iter R5;
+  iter = 0;
+
+  alias user_tab_ind R6;
+
+  while (iter<MAX_USER_NUM) do
+    if ( [USER_TABLE + iter*2] == user_name ) then
+      break;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  //If entry not found
+  if (iter == MAX_USER_NUM) then
+    SP = userSP;
+    //Mode field reset to 0
+    [mode_flag_addr] = 0;
+    //Storing return value in stack
+    [ret_phy_addr] = -2;
+    ireturn;
+  endif;
+
+  user_tab_ind = iter;
+
+  //If userid of the process not equal to userid of the user
+  if (user_tab_ind != [SYSTEM_STATUS_TABLE]) then
+    //If current user is not root
+    if ([SYSTEM_STATUS_TABLE] != ROOT) then
+      SP = userSP;
+      //Mode field reset to 0
+      [mode_flag_addr] = 0;
+      //Storing return value in stack
+      [ret_phy_addr] = -1;
+      ireturn;
+    endif;
+  endif;
+
+  //Setting new password
+  encrypt pwd;
+  [USER_TABLE + user_tab_ind*2 + 1] = pwd;
+
+  ret_value = 0;
+endif;
+
+//Getuid
+if (sys_call_num == 26) then
+  //Setting mode flag to 26
+  [mode_flag_addr] = 26;
+
+  alias user_name R3;
+
+  alias iter R4;
+  alias user_id R5;
+
+  iter = 0;
+  while (iter<MAX_USER_NUM) do
+    if ( [USER_TABLE + iter*2] == user_name ) then
+      break;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  //If entry not found
+  if (iter == MAX_USER_NUM) then
+    SP = userSP;
+    //Mode field reset to 0
+    [mode_flag_addr] = 0;
+    //Storing return value in stack
+    [ret_phy_addr] = -1;
+    ireturn;
+  endif;
+  user_id = iter;
+
+  ret_value = user_id;
+endif;
+
+//Getuname
+if (sys_call_num == 25) then
+  //Setting mode flag to 25
+  [mode_flag_addr] = 25;
+
+  alias user_id R3;
+
+  if ( (user_id<0) || (user_id>15) || ([USER_TABLE + user_id*2]==-1) ) then
+    SP = userSP;
+    //Mode field reset to 0
+    [mode_flag_addr] = 0;
+    //Storing return value in stack
+    [ret_phy_addr] = -1;
+    ireturn;
+  endif;
+
+  alias user_name R5;
+  user_name = [USER_TABLE + user_id*2];
+
+  ret_value = user_name;
+endif;
+
+SP = userSP;
+//Mode field reset to 0
+[mode_flag_addr] = 0;
+//Storing return value in stack
+[ret_phy_addr] = ret_value;
+ireturn;
