@@ -99,7 +99,7 @@ if (sys_call_num==1) then
   [ROOT_FILE + free_entry*8 + 4] = permission;
 endif;
 
-
+//Delete
 if (sys_call_num == 4) then
   //Setting mode flag to 1
   [proc_tab_entry + 9] = 4;

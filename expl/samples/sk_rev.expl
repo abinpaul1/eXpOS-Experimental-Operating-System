@@ -2,7 +2,7 @@ int main()
 {
 	decl
 		string fileName,data;
-		int perm,i,fileDesc,temp;
+		int perm,i,fileDesc,temp,temp2;
 	
 	enddecl
 	begin
@@ -21,7 +21,7 @@ int main()
 			
 			i=i-1;		
 			temp = exposcall("Seek",fileDesc,-1);
-			temp = exposcall("Read",fileDesc,data);
+			temp2 = exposcall("Read",fileDesc,data);
 			temp = exposcall("Seek",fileDesc,-1);
 			temp = exposcall("Write",-2,data);
 		endwhile;		

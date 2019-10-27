@@ -13,7 +13,7 @@ SP = [PROCESS_TABLE + currentPID*16 + 11]*512 - 1;
 [PROCESS_TABLE + currentPID*16 + 9] = 21;
 
 //If current process is not shell or current user is not root
-if ( ([SYSTEM_STATUS_TABLE + 1]!=2) || ([PROCESS_TABLE + currentPID*16 + 3]!=ROOT) ) then
+if ( ([SYSTEM_STATUS_TABLE + 1]!=2) || ([SYSTEM_STATUS_TABLE]!=ROOT) ) then
   SP = userSP;
   //Mode field reset to 0
   [PROCESS_TABLE + currentPID*16 + 9] = 0;

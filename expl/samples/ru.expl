@@ -1,0 +1,37 @@
+int main()
+{
+	decl
+		int temp ,i,fileDesc, remuid,uid;
+		string fileName, remUser;
+	enddecl
+	begin
+    temp = exposcall("Read",-1,remUser);
+    remuid = exposcall("Getuid",remUser);
+
+		fileDesc = exposcall("Open","root");
+		if(fileDesc>=0 ) then
+
+			i=0;
+			while(i<60) do
+				temp = exposcall("Read",fileDesc,fileName);
+				if(fileName!="-1") then
+          temp = exposcall("Seek",fileDesc,2);
+          temp = exposcall("Read",fileDesc,uid);
+
+  				if(uid==remuid) then
+  		      temp = exposcall("Delete",fileName);
+  				endif;
+  				temp = exposcall("Seek",fileDesc,4);
+				else
+          temp = exposcall("Seek",fileDesc,7);
+        endif;
+				i = i+1;
+			endwhile;
+		endif;
+
+    temp = exposcall("Remusr",remUser);
+    write(temp);
+
+		return 0;
+	end
+}

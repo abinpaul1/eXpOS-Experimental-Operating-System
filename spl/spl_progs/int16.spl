@@ -147,14 +147,17 @@ if (sys_call_num==23) then
   //Checking root file
   iter = 0;
   while(iter<MAX_FILE_NUM) do
-    if ([ROOT_FILE + iter*8 + 3]==user_name) then
-      break;
+    //If entry is valid
+    if ([ROOT_FILE + iter*8]!=-1) then
+      if ([ROOT_FILE + iter*8 + 3]==user_tab_ind) then
+        break;
+      endif;
     endif;
     iter = iter + 1;
   endwhile;
 
   //If files of user is present
-  if (iter == MAX_USER_NUM) then
+  if (iter != MAX_FILE_NUM) then
     SP = userSP;
     //Mode field reset to 0
     [mode_flag_addr] = 0;

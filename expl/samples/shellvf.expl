@@ -15,18 +15,18 @@ begin
         if(input == "Logout" OR input == "Shutdown") then
             flag=1;
         endif;
-              
+
         if(input == "Remusr" OR input == "Getuid" OR input == "Getuname") then
             flag=1;
             temp = exposcall("Read",-1, username);
         endif;
-              
+
         if(input == "Newusr" OR input == "Setpwd") then
             flag=1;
             temp = exposcall("Read",-1, username);
             temp = exposcall("Read",-1, password);
         endif;
-              
+
         if(flag==1) then
             retcom = exposcall(input, username, password);
             if(retcom < 0) then
@@ -42,7 +42,7 @@ begin
                 temp = exposcall("Write",-2, "Fork Fail");
                 continue;
             endif;
-            
+
             if(pid != 0) then
                 temp = exposcall("Wait",pid);
             else
@@ -54,7 +54,7 @@ begin
             endif;
         endif;
     endwhile;
-          
+
     return 0;
 end
 }
