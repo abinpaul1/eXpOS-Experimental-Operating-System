@@ -181,6 +181,11 @@ if (functionNum==5) then
   //Looping through process (pid = 2 to MAX_PROC_NUM-1)
   iter = 2;
   while (iter < MAX_PROC_NUM) do
+    if (iter == 15) then
+      //Swapper daemon--pid=15 must not be terminated
+      iter = iter + 1;
+      continue;
+    endif;
     if ( (iter!= currentPID) && [PROCESS_TABLE + iter*16 + 4]!=TERMINATED) then
       multipush(R0, R1, R2, R3);
       R1 = 3;

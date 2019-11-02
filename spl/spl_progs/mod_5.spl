@@ -15,28 +15,50 @@ process_table_entry = PROCESS_TABLE + currentPID*16;
 
 
 alias newPID R2;
-alias c_id R3;
+alias pte R3;
 alias temp_state R4;
 alias temp_pid R5;
+
 
 // Default new process is set as idle
 newPID = 0;
 
 alias iter R6;
-iter = currentPID + 1;
-//Iterating from next process
-c_id = process_table_entry + 16;
-// Loops till end of process table
-while (iter<=15) do
-    temp_pid = [c_id + 1];
-  	temp_state = [c_id + 4];
-  	if (temp_state == CREATED || temp_state == READY) then
-          newPID = temp_pid;
-          break;
-  	endif;
-  	c_id = c_id + 16;
-    iter = iter + 1;
-endwhile;
+temp_pid = currentPID;
+
+//If Paging is ongoing
+if ([SYSTEM_STATUS_TABLE + 5]!=0) then
+  //If process is not blocked
+  if ( [process_table_entry + 4]==READY || [process_table_entry + 4]==RUNNING) then
+    //Schedule swapper daemon
+    newPID = 15;
+  endif;
+else
+  iter = 1;
+  // Loops till end of process table
+  while (iter<=15) do
+      if (temp_pid<15) then
+        temp_pid = temp_pid + 1;
+      else
+        temp_pid = 1;
+      endif;
+
+      //Excluding swapper daemon
+      if (temp_pid == 15) then
+        iter = iter + 1;
+        continue;
+      endif;
+      
+      pte = PROCESS_TABLE + temp_pid*16;
+      temp_state = [pte + 4];
+      if ( (temp_state == CREATED || temp_state == READY) && [pte+6]==0 ) then
+            newPID = temp_pid;
+            break;
+      endif;
+      iter = iter + 1;
+  endwhile;
+endif;
+
 
 alias new_process_table R7;
 new_process_table = PROCESS_TABLE + newPID*16;

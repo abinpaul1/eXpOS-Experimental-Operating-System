@@ -101,6 +101,10 @@ loadi(49,62);
 loadi(50,63);
 loadi(51,64);
 
+//MOD 6 loading
+loadi(52,65);
+loadi(53,66);
+
 //Inode table + user table loading
 loadi(59,3);
 loadi(60,4);
@@ -117,39 +121,54 @@ loadi(62,5);
 
 alias iter R0;
 
+//Initializing TICK field to 0 for all process table entries
+iter = 0;
+while (iter<16) do
+  [PROCESS_TABLE + iter*16] = 0;
+  iter = iter + 1;
+endwhile;
+
 //Initializing open file table
 iter = 0;
 while(iter<32) do
-  [OPEN_FILE_TABLE + iter*4] = -1;
-  [OPEN_FILE_TABLE + iter*4 + 1] = 0;
+  alias oft R5;
+  oft = OPEN_FILE_TABLE + iter*4;
+  [oft] = -1;
+  [oft + 1] = 0;
   iter = iter + 1;
 endwhile;
 
 //Initializing file status table
 iter = 0;
 while(iter<60) do
-  [FILE_STATUS_TABLE + iter*4] = -1;
-  [FILE_STATUS_TABLE + iter*4 + 1] = -1;
+  alias fst R5;
+  fst = FILE_STATUS_TABLE + iter*4;
+  [fst] = -1;
+  [fst + 1] = -1;
   iter = iter + 1;
 endwhile;
 
 //Initializing the buffer table
 iter = 0;
 while(iter<4) do
-  [BUFFER_TABLE + iter*4] = -1;
+  alias bt R5;
+  bt = BUFFER_TABLE + iter*4;
+  [bt] = -1;
   //Setting dirty bit to 0
-  [BUFFER_TABLE + iter*4 + 1] = 0;
-  [BUFFER_TABLE + iter*4 + 2] = -1;
+  [bt + 1] = 0;
+  [bt + 2] = -1;
   iter = iter + 1;
 endwhile;
 
 //Initializing semaphore table
 iter = 0;
 while (iter<32) do
+  alias st R5;
+  st = SEMAPHORE_TABLE + iter*4;
   //locking pid to -1
-  [SEMAPHORE_TABLE + iter*4] = -1;
+  [st] = -1;
   //process count to 0
-  [SEMAPHORE_TABLE + iter*4 + 1] = 0;
+  [st + 1] = 0;
   iter = iter + 1;
 endwhile;
 
@@ -168,10 +187,13 @@ while (iter<128) do
   iter = iter + 1;
 endwhile;
 
-// Initialize MEM_FREE_COUNT to free pages -- (128-81 = 47)
-[SYSTEM_STATUS_TABLE + 2] = 47;
+// Initialize MEM_FREE_COUNT to free pages -- (128-83 = 45)
+[SYSTEM_STATUS_TABLE + 2] = 45;
 //initialize WAIT_MEM_COUNT to 0
 [SYSTEM_STATUS_TABLE + 3] = 0;
+//Initialize swapped count to 0 and paging status to 0
+[SYSTEM_STATUS_TABLE + 4] = 0;
+[SYSTEM_STATUS_TABLE + 5] = 0;
 
 //Setting terminal as free
 [TERMINAL_STATUS_TABLE]=0;
@@ -229,7 +251,7 @@ PROC_TAB = PROCESS_TABLE + 16;
 //State is CREATED as idle process is going to be scheduled first
 [PROC_TAB + 4] = CREATED;
 //Setting UPTR to stack logical address
-[PROC_TAB + 13] = 8*512;
+[PROC_TAB + 13] = 4096;
 //Setting KPTR to 0
 [PROC_TAB + 12] = 0;
 //Setting PTBR
@@ -237,8 +259,8 @@ PROC_TAB = PROCESS_TABLE + 16;
 //Setting PTLR
 [PROC_TAB + 15] = 10;
 //Stack pointer to entry point in code header
-[66*512] = [65*512 + 1];
-
+//[66*512] = [65*512 + 1];
+[33792]=[33281];
 
 //Setting PTBR for pid = 2, shell process
 PTBR = PAGE_TABLE_BASE+40;
@@ -286,7 +308,7 @@ PROC_TAB = PROCESS_TABLE + 32;
 //State is TERMINATED
 [PROC_TAB + 4] = TERMINATED;
 //Setting UPTR to stack logical address
-[PROC_TAB + 13] = 8*512;
+[PROC_TAB + 13] = 4096;
 //Setting KPTR to 0
 [PROC_TAB + 12] = 0;
 //Setting PTBR
@@ -294,7 +316,8 @@ PROC_TAB = PROCESS_TABLE + 32;
 //Setting PTLR
 [PROC_TAB + 15] = 10;
 //Stack pointer to entry point in code header
-[78*512] = [67*512 + 1];
+//[78*512] = [67*512 + 1];
+[39936]=[34305];
 
 //Initializing disk map table entries of shell -- pid =2
 alias disk_map_entry R1;

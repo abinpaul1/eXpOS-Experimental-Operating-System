@@ -9,6 +9,7 @@ load --module 3 ../spl/spl_progs/mod_3_fileManager.xsm
 load --module 1 ../spl/spl_progs/mod_1_procManager.xsm
 load --module 2 ../spl/spl_progs/mod_2_memManager.xsm
 load --module 0 ../spl/spl_progs/mod_0.xsm
+load --module 6 ../spl/spl_progs/mod_6_pager.xsm
 load --int=timer ../spl/spl_progs/sample_timer.xsm
 load --int=console ../spl/spl_progs/console_int.xsm
 load --int=disk ../spl/spl_progs/disk_int.xsm
@@ -47,5 +48,16 @@ load --exec ../expl/samples/sk_rev.xsm
 load --exec ../expl/samples/w100.xsm
 load --exec ../expl/samples/child.xsm
 load --exec ../expl/samples/parent.xsm
+load --exec ../expl/samples/pid.xsm
+load --exec ../expl/samples/a1.xsm
+load --exec ../expl/samples/m_store.xsm
+load --exec ../expl/samples/m_sort.xsm
+load --exec ../expl/samples/m_merge.xsm
+load --exec ../expl/samples/a2.xsm
+load --exec ../expl/samples/a3.xsm
+load --exec ../expl/samples/a4.xsm
+load --exec ../expl/samples/pgm1.xsm
+load --exec ../expl/samples/pgm2.xsm
+load --exec ../expl/samples/a5.xsm
 load --data ../sample.dat
 load --data ../numbers.dat

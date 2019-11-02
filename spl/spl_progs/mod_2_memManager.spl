@@ -138,3 +138,22 @@ if (functionNum == 5) then
   R0 = free_page;
   return;
 endif;
+
+//Get swap block
+if (functionNum==6) then
+  alias iter R2;
+  iter = DISK_SWAP_AREA;
+  while (iter<DISK_SIZE) do
+    //If a block is free
+    if ([DISK_FREE_LIST + iter] == 0) then
+      [DISK_FREE_LIST + iter] = 1;
+      //Returning the block number
+      R0 = iter;
+      return;
+    endif;
+    iter = iter + 1;
+  endwhile;
+  //If no free blocks
+  R0 = -1;
+  return;
+endif;

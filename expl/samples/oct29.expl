@@ -1,0 +1,44 @@
+int main()
+{
+decl
+  int temp,pid1,pid2,a1,a2,a3,a4;
+enddecl
+begin
+  pid1 = exposcall("Fork");
+  pid2 = exposcall("Fork");
+  if (pid1!=0) then
+    if (pid2==0) then
+      a1=100;
+      while(a1<200) do
+        temp = exposcall("Write",-2,a1);
+        a1 = a1 + 1;
+      endwhile;
+    else
+      a2=1000;
+      while(a2<1100) do
+        temp = exposcall("Write",-2,a2);
+        a2 = a2 + 1;
+      endwhile;
+      temp = exposcall("Wait",pid2);
+    endif;
+
+  endif;
+  if (pid1==0)then
+    if (pid2==0) then
+      a3=2000;
+      while(a3<2100) do
+        temp = exposcall("Write",-2,a3);
+        a3 = a3 + 1;
+      endwhile;
+    else
+      a4=3000;
+      while(a4<3100) do
+        temp = exposcall("Write",-2,a4);
+        a4 = a4 + 1;
+      endwhile;
+      temp = exposcall("Wait",pid1);
+    endif;
+  endif;
+  return 0;
+end
+}

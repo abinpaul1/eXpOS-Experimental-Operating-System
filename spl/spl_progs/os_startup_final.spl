@@ -45,8 +45,12 @@ PTLR = 10;
 alias PROC_TAB R0;
 PROC_TAB = PROCESS_TABLE;
 //Process table entry for idle program
+//Tick = 0
+[PROC_TAB] = 0;
 //pid = 0
 [PROC_TAB + 1] = 0;
+//UserID = 0
+[PROC_TAB + 3] = 0;
 //Assigning UArea page number
 [PROC_TAB + 11] = 76;
 //State is RUNNING
@@ -62,6 +66,61 @@ PROC_TAB = PROCESS_TABLE;
 //Setting entry point IP Value from header to stack top
 [70 * 512] = [69*512 + 1];
 
+
+//Initializing the Swapper Daemon--pid=15
+PTBR = PAGE_TABLE_BASE + 20*15;
+PTLR = 10;
+
+// Shared Library
+[PTBR+0] = -1;
+[PTBR+1] = "0000";
+[PTBR+2] = -1;
+[PTBR+3] = "0000";
+
+//Heap
+[PTBR+4] = -1;
+[PTBR+5] = "0000";
+[PTBR+6] = -1;
+[PTBR+7] = "0000";
+
+//Code
+[PTBR+8] = 69;
+[PTBR+9] = "0100";
+[PTBR+10] = -1;
+[PTBR+11] = "0000";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+//Stack
+[PTBR+16] = 81;
+[PTBR+17] = "0110";
+[PTBR+18] = -1;
+[PTBR+19] = "0000";
+
+PROC_TAB = PROCESS_TABLE + 15*16;
+//Process table entry for swapper daemon program
+//Tick = 0
+[PROC_TAB] = 0;
+//pid = 15
+[PROC_TAB + 1] = 15;
+//UserID = 0
+[PROC_TAB + 3] = 0;
+//Assigning UArea page number
+[PROC_TAB + 11] = 82;
+//State is CREATED
+[PROC_TAB + 4] = CREATED;
+//Setting UPTR to stack logical address
+[PROC_TAB + 13] = 8*512;
+//Setting KPTR to 0
+[PROC_TAB + 12] = 0;
+//Setting PTBR
+[PROC_TAB + 14] = PAGE_TABLE_BASE + 20*15;
+//Setting PTLR
+[PROC_TAB + 15] = 10;
+//Setting entry point IP Value from header to stack top
+[81 * 512] = [69*512 + 1];
 
 //Setting machine registers for scheduling idle process
 PTBR = PAGE_TABLE_BASE;

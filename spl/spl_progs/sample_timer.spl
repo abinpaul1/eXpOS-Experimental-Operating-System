@@ -9,16 +9,75 @@ currentPID = [SYSTEM_STATUS_TABLE+1];
 alias process_table_entry R1;
 process_table_entry = PROCESS_TABLE + currentPID*16;
 
+//If swapping is initialized
+if ([SYSTEM_STATUS_TABLE + 5] != 0) then
+  //If swapper daemon process is running
+  if (currentPID == 15) then
+    if ([SYSTEM_STATUS_TABLE + 5] == SWAP_OUT) then
+      //Calling swap_out function
+      multipush(R0,R1);
+      R1 = 1;
+      call MOD_6;
+      multipop(R0,R1);
+    else
+      if ([SYSTEM_STATUS_TABLE + 5] == SWAP_IN) then
+        //Calling swap_in function
+        multipush(R0,R1);
+        R1 = 2;
+        call MOD_6;
+        multipop(R0,R1);
+      endif;
+    endif;
+  endif;
+else
+  //Check if swapping is to be initiated : MEM_FREE_COUNT < MEM_LOW
+  if ([SYSTEM_STATUS_TABLE + 2] < MEM_LOW) then
+    [SYSTEM_STATUS_TABLE + 5] = SWAP_OUT;
+  else
+    //If swapped count > 0
+    if ( [SYSTEM_STATUS_TABLE + 4] > 0) then
+      //If MEM_FREE_COUNT > MEM_HIGH
+      if ( [SYSTEM_STATUS_TABLE + 2] > MEM_HIGH ) then
+        [SYSTEM_STATUS_TABLE + 5] = SWAP_IN;
+      else
+        alias iter R3;
+        iter = 3;
+        while (iter<16) do
+          if ([PROCESS_TABLE + iter*16 + 4] != TERMINATED && [PROCESS_TABLE + iter*16 + 6]==1 ) then
+            if ( [PROCESS_TABLE + iter*16] > MAX_TICK ) then
+              [SYSTEM_STATUS_TABLE + 5] = SWAP_IN;
+              break;
+            endif;
+          endif;
+          iter = iter + 1;
+        endwhile;
+      endif;
+    endif;
+  endif;
+endif;
+
+
+
 [process_table_entry + 4] = READY;
+
+//Incrementing tick field of each process
+alias iter R4;
+iter = 0;
+while (iter<16) do
+  if ([PROCESS_TABLE + iter*16 + 1] != -1) then
+    [PROCESS_TABLE +iter*16] = [PROCESS_TABLE +iter*16] + 1;
+  endif;
+  iter = iter + 1;
+endwhile;
 
 backup;
 call MOD_5;
 restore;
 
-alias newPID R4;
+alias newPID R5;
 newPID = [SYSTEM_STATUS_TABLE+1];
 
-alias new_process_table R5;
+alias new_process_table R6;
 new_process_table = PROCESS_TABLE + newPID*16;
 
 // Restoring register context
