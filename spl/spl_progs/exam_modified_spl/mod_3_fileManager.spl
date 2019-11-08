@@ -1,0 +1,263 @@
+alias functionNum R1;
+
+//Buffered read/write
+if (functionNum==1 || functionNum==2) then
+  alias disk_block_num R2;
+  alias offset R3;
+
+  alias buffer_num R5;
+  //buffer_num = disk_block_num % 4;
+
+  alias iter R7;
+  iter = 0;
+
+  buffer_num = -1;
+  alias highest_age R8;
+  highest_age = -1;
+  alias flag R10;
+  flag = 0;
+
+  while(iter<4) do
+    if ( [BUFFER_TABLE + iter*4] == disk_block_num) then
+      buffer_num = iter;
+      break;
+    endif;
+    if ( [BUFFER_TABLE + iter*4]==-1) then
+      buffer_num = iter;
+      flag = 1;
+    else
+      if (flag!=1) then
+        if ([BUFFER_TABLE + iter*4 + 3] > highest_age) then
+          buffer_num = iter;
+          highest_age = [BUFFER_TABLE + iter*4 + 3];
+        endif;
+      endif;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  //Updating age
+  iter = 0;
+  while(iter<4) do
+    if (iter!=buffer_num) then
+      [BUFFER_TABLE + iter*4 + 3] = [BUFFER_TABLE + iter*4 + 3] + 1;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  //Resetting age to 0 for hit
+  [BUFFER_TABLE + buffer_num*4 + 3] = 0;
+
+
+
+  //Acquiring buffer
+  multipush(R0,R1,R2,R3,R4,R5);
+  R1 = 1;
+  R2 = [SYSTEM_STATUS_TABLE + 1];
+  R3 = buffer_num;
+  call MOD_0;
+  multipop(R0,R1,R2,R3,R4,R5);
+
+
+
+
+  //If buffer contains different disk block
+  if ([BUFFER_TABLE + buffer_num*4] != disk_block_num) then
+    //If buffer has been modified
+    if ([BUFFER_TABLE + buffer_num*4 + 1] == 1) then
+      //Writing back modified buffer
+      multipush(R0,R1,R2,R3,R4,R5);
+      R1 = 1;
+      R2 = [SYSTEM_STATUS_TABLE + 1];
+      R3 = 71 + buffer_num;
+      R4 = [BUFFER_TABLE + buffer_num*4];
+      call MOD_4;
+      multipop(R0,R1,R2,R3,R4,R5);
+
+      //Marking as clean
+      [BUFFER_TABLE + buffer_num*4 + 1] = 0;
+    endif;
+
+    //Loading the required disk block
+    multipush(R0,R1,R2,R3,R4,R5);
+    R1 = 2;
+    R4 = disk_block_num;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = 71 + buffer_num;
+    call MOD_4;
+    multipop(R0,R1,R2,R3,R4,R5);
+
+    //Setting new disk block in the buffer table entry
+    [BUFFER_TABLE + buffer_num*4] = disk_block_num;
+    //Printing buffer table
+    iter = 30016;
+    while (iter<30032) do
+      print [iter];
+      iter = iter + 1;
+    endwhile;
+    print " ";
+  endif;
+
+  if (functionNum==2) then
+    //Copying the contents into variable
+    alias word_addr R4;
+    [word_addr] = [ (71 + buffer_num)*512 + offset ];
+  else
+    alias word R4;
+    //Copying contents of the word into the buffer
+    [ (71 + buffer_num)*512 + offset ] =word;
+    //Marking buffer as dirty
+    [BUFFER_TABLE + buffer_num*4 + 1] = 1;
+  endif;
+
+  //Releasing buffer
+  multipush(R0,R1,R2,R3,R4,R5);
+  R1 = 2;
+  R2 = [SYSTEM_STATUS_TABLE + 1];
+  R3 = buffer_num;
+  call MOD_0;
+  multipop(R0,R1,R2,R3,R4,R5);
+
+  return;
+endif;
+
+
+//Open
+if (functionNum==3) then
+  alias fileName R2;
+  alias iter R3;
+
+  alias inode_index R4;
+
+  iter = 0;
+  //Checking for file in inode table
+  while(iter<60) do
+    if ( [INODE_TABLE + iter*16 + 1] == fileName) then
+      break;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  //If not found
+  if (iter==60) then
+    R0 = -1;
+    return;
+  endif;
+
+  inode_index = iter;
+
+  //Acquiring inode
+  multipush(R1,R2,R3,R4);
+  R1 = 4;
+  R2 = [SYSTEM_STATUS_TABLE + 1];
+  R3 = inode_index;
+  call MOD_0;
+  multipop(R1,R2,R3,R4);
+  if (R0==-1) then
+    return;
+  endif;
+  //If the file is of type EXEC
+  if ( [INODE_TABLE + inode_index*16] == EXEC) then
+    //Release inode
+    multipush(R1,R2,R3,R4);
+    R1 = 5;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = inode_index;
+    call MOD_0;
+    multipop(R1,R2,R3,R4);
+    R0 = -1;
+    return;
+  endif;
+
+  alias open_tab_index R5;
+  //Finding free entry in Open file table
+  iter = 0;
+  while(iter<32) do
+    if ([OPEN_FILE_TABLE + iter*4]==-1) then
+      break;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  if ( iter == 32) then
+    //Release inode
+    multipush(R0,R1,R2,R3,R4);
+    R1 = 5;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = inode_index;
+    call MOD_0;
+    multipop(R0,R1,R2,R3,R4);
+    R0 = -2;
+    return;
+  endif;
+
+  open_tab_index = iter;
+
+  alias oft_entry R7;
+  oft_entry = OPEN_FILE_TABLE + open_tab_index*4;
+
+  if ([INODE_TABLE + inode_index*16] == ROOT) then
+    [oft_entry] = INODE_ROOT;
+  else
+    //Incrementing file open count
+    alias fst_entry R8;
+    fst_entry = FILE_STATUS_TABLE + inode_index*4;
+
+    if ([fst_entry + 1] == -1) then
+      [fst_entry + 1] = 1;
+    else
+      [fst_entry + 1] = [fst_entry + 1] + 1;
+    endif;
+    //Setting inode index field
+    [oft_entry] = inode_index;
+  endif;
+
+  //Setting open instance count
+  [oft_entry + 1] = 1;
+  //Setting Lseek
+  [oft_entry + 2] = 0;
+
+  //Releasing inode
+  multipush(R0,R1,R2,R3,R4,R5);
+  R1 = 5;
+  R2 = [SYSTEM_STATUS_TABLE + 1];
+  R3 = inode_index;
+  call MOD_0;
+  multipop(R0,R1,R2,R3,R4,R5);
+
+  R0 = open_tab_index;
+  return;
+endif;
+
+//Close
+if (functionNum==4) then
+  alias open_tab_index R2;
+
+  alias inode_index R4;
+  inode_index = [OPEN_FILE_TABLE + open_tab_index*4];
+
+  alias oft_entry R5;
+  oft_entry = OPEN_FILE_TABLE + open_tab_index*4;
+
+  //Decrementing open instance count
+  [oft_entry + 1] = [oft_entry + 1] - 1;
+
+  if ([oft_entry + 1] == 0) then
+    //If file is not root, decremnt file open count in file status table
+    if([oft_entry] != INODE_ROOT) then
+      alias fst_entry R6;
+      fst_entry = FILE_STATUS_TABLE + inode_index*4;
+      [fst_entry + 1] = [fst_entry + 1] - 1;
+      if ([fst_entry + 1] == 0) then
+        [fst_entry + 1] = -1;
+      endif;
+    endif;
+
+    //Invalidating the open file table entry
+    [oft_entry] = -1;
+    [oft_entry + 1] = 0;
+    [oft_entry + 2] = -1;
+
+  endif;
+  return;
+endif;

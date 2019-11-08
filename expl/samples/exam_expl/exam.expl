@@ -1,0 +1,31 @@
+decl
+    int pid, temp, filedis, a;
+enddecl
+
+int main()
+{
+begin
+    temp=exposcall("Create","odd_e.dat",1);
+    temp=exposcall("Create","even_e.dat",1);
+
+    pid = exposcall("Fork");
+    if(pid > 0) then
+        filedis = exposcall("Open", "odd_e.dat");
+        a = 0;
+        while(a <= 4000)  do
+            temp = exposcall("Write",filedis,a);
+            a = a + 2;
+        endwhile;
+        temp=exposcall("Close",filedis);
+    else
+        filedis = exposcall("Open", "even_e.dat");
+        a = 1;
+        while(a <= 4000)  do
+            temp = exposcall("Write",filedis,a);
+            a = a + 2;
+        endwhile;
+        temp=exposcall("Close",filedis);
+    endif;
+    return 0;
+end
+}

@@ -1,0 +1,22 @@
+decl
+    int temp, filedis, a, fd;
+    string filename, data;
+enddecl
+int main()
+{
+begin
+    temp=exposcall("Create","fnl.dat",1);
+    filedis = exposcall("Open", "odd_e.dat");
+    fd = exposcall("Open", "fnl.dat");
+    if (filedis!=-1) then
+      a = 0;
+      while(a != -2)  do
+          a = exposcall("Read",filedis,data);
+          temp = exposcall("Write",fd,data);
+      endwhile;
+    endif;
+    temp = exposcall("Close",filedis);
+    temp = exposcall("Close",fd);
+    return 0;
+end
+}
