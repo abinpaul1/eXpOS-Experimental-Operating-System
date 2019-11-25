@@ -33,7 +33,7 @@ if (sys_call_num==1) then
 
   iter = 0;
   //Checking if file is already present in the system
-  while(iter<60) do
+  while(iter<MAX_FILE_NUM) do
     if ( [INODE_TABLE + iter*16] == DATA) then
       if ( [INODE_TABLE + iter*16 + 1] == file_name) then
         SP = userSP;
@@ -50,7 +50,7 @@ if (sys_call_num==1) then
   iter = 0;
 
   //Checking for free entry
-  while(iter<60) do
+  while(iter<MAX_FILE_NUM) do
     if ([INODE_TABLE + iter*16 + 1] == -1) then
       break;
     endif;
@@ -58,7 +58,7 @@ if (sys_call_num==1) then
   endwhile;
 
   //If no free entry is found
-  if (iter==60) then
+  if (iter==MAX_FILE_NUM) then
     SP = userSP;
     //Mode field reset to 0
     [proc_tab_entry + 9] = 0;
@@ -95,7 +95,7 @@ if (sys_call_num==1) then
   [ROOT_FILE + free_entry*8 + 1] = 0;
   [ROOT_FILE + free_entry*8 + 2] = DATA;
   //Setting user id
-  [ROOT_FILE + free_entry*8 + 3] = [proc_tab_entry + 3];
+  [ROOT_FILE + free_entry*8 + 3] = [USER_TABLE + (2 * [proc_tab_entry + 3])];
   [ROOT_FILE + free_entry*8 + 4] = permission;
 endif;
 
@@ -109,7 +109,7 @@ if (sys_call_num == 4) then
 
   alias inode_index R5;
   //Checking for file in the inode table
-  while(iter<60) do
+  while(iter<MAX_FILE_NUM) do
     if ( [INODE_TABLE + iter*16 + 1] == file_name) then
       break;
     endif;
@@ -122,7 +122,7 @@ if (sys_call_num == 4) then
   inode_addr = INODE_TABLE + inode_index*16;
 
   //If file is not present in inode table
-  if (iter==60) then
+  if (iter==MAX_FILE_NUM) then
     SP = userSP;
     //Mode field reset to 0
     [proc_tab_entry + 9] = 0;
@@ -168,7 +168,12 @@ if (sys_call_num == 4) then
   //If file is open
   if ([FILE_STATUS_TABLE + inode_index*4 + 1] != -1) then
     //Releasing the lock
-    [FILE_STATUS_TABLE + inode_index*4] = -1;
+		backup;
+		R1 = 5;
+		R2 = [SYSTEM_STATUS_TABLE+1];
+		R3 = inode_index;
+		call MOD_0;
+		restore;
     SP = userSP;
     //Mode field reset to 0
     [proc_tab_entry + 9] = 0;
@@ -186,10 +191,10 @@ if (sys_call_num == 4) then
       buffer_block_num = disk_blockNum % 4;
 
       alias buffer_tab_ind R9;
-      buffer_tab_ind = BUFFER_TABLE + buffer_block_num*4 + 1;
+      buffer_tab_ind = BUFFER_TABLE + buffer_block_num*4;
       //Resetting dirty bit of buffer block if it is set
-      if ([buffer_tab_ind] != 0) then
-        [buffer_tab_ind] = 0;
+      if ( [buffer_tab_ind+1] != 0 && [buffer_tab_ind] == disk_blockNum) then
+        [buffer_tab_ind+1] = 0;
       endif;
 
       //Releasing the block

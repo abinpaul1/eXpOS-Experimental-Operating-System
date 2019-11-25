@@ -35,27 +35,23 @@ else
     [SYSTEM_STATUS_TABLE + 5] = SWAP_OUT;
   else
     //If swapped count > 0
-    if ( [SYSTEM_STATUS_TABLE + 4] > 0) then
+    if ( [SYSTEM_STATUS_TABLE + 4] != 0) then
       //If MEM_FREE_COUNT > MEM_HIGH
-      if ( [SYSTEM_STATUS_TABLE + 2] > MEM_HIGH ) then
-        [SYSTEM_STATUS_TABLE + 5] = SWAP_IN;
-      else
-        alias iter R3;
-        iter = 3;
-        while (iter<16) do
-          if ([PROCESS_TABLE + iter*16 + 4] != TERMINATED && [PROCESS_TABLE + iter*16 + 6]==1 ) then
-            if ( [PROCESS_TABLE + iter*16] > MAX_TICK ) then
-              [SYSTEM_STATUS_TABLE + 5] = SWAP_IN;
-              break;
-            endif;
-          endif;
-          iter = iter + 1;
-        endwhile;
-      endif;
+
+      alias iter R3;
+      iter = 3;
+      while (iter<16) do
+        alias process_table R7;
+				process_table = PROCESS_TABLE + 16*iter;
+				if((([process_table + 6] == 1) && ([process_table] > MAX_TICK)) || ([SYSTEM_STATUS_TABLE + 2] > MEM_HIGH)) then
+					[SYSTEM_STATUS_TABLE + 5] = SWAP_IN;
+					break;
+				endif;
+        iter = iter + 1;
+      endwhile;
     endif;
   endif;
 endif;
-
 
 
 [process_table_entry + 4] = READY;
@@ -64,25 +60,16 @@ endif;
 alias iter R4;
 iter = 0;
 while (iter<16) do
-  if ([PROCESS_TABLE + iter*16 + 1] != -1) then
+  if ([PROCESS_TABLE + iter*16 + 4] != TERMINATED) then
     [PROCESS_TABLE +iter*16] = [PROCESS_TABLE +iter*16] + 1;
   endif;
   iter = iter + 1;
 endwhile;
 
-backup;
+
 call MOD_5;
-restore;
 
-alias newPID R5;
-newPID = [SYSTEM_STATUS_TABLE+1];
 
-alias new_process_table R6;
-new_process_table = PROCESS_TABLE + newPID*16;
-
-// Restoring register context
-PTBR = [new_process_table + 14];
-PTLR = [new_process_table + 15];
 restore;
 
 // Changing SP to user stack

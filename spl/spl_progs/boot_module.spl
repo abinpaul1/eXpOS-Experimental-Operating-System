@@ -178,7 +178,7 @@ endwhile;
 
 //Initialize memory free list
 iter = 0;
-while (iter<81) do
+while (iter<83) do
   [MEMORY_FREE_LIST + iter] = 1;
   iter = iter + 1;
 endwhile;

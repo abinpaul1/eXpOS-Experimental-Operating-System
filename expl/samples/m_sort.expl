@@ -157,8 +157,8 @@ int main()
     pid=exposcall("Getpid");
     x=pid+1;
     while(x<13) do
-        a=exposcall("Wait",x);
-        x=x+1;
+    	a=exposcall("Wait",x);
+    	x=x+1;
     endwhile;
     return 1;
   end

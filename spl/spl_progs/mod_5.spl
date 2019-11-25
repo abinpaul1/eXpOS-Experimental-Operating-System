@@ -3,8 +3,7 @@ currentPID = [SYSTEM_STATUS_TABLE+1];
 
 // Storing BP into kernel stack
 
-SP = SP+1;
-[SP] = BP;
+multipush(BP);
 
 alias process_table_entry R1;
 process_table_entry = PROCESS_TABLE + currentPID*16;
@@ -16,46 +15,33 @@ process_table_entry = PROCESS_TABLE + currentPID*16;
 
 alias newPID R2;
 alias pte R3;
-alias temp_state R4;
 alias temp_pid R5;
 
 
 // Default new process is set as idle
 newPID = 0;
 
-alias iter R6;
-temp_pid = currentPID;
+temp_pid = currentPID+1;
 
 //If Paging is ongoing
 if ([SYSTEM_STATUS_TABLE + 5]!=0) then
-  //If process is not blocked
-  if ( [process_table_entry + 4]==READY || [process_table_entry + 4]==RUNNING) then
+  //If swapper process is not blocked
+  alias swapper_pte R8;
+  swapper_pte = PROCESS_TABLE + 15*16;
+  if ( [swapper_pte + 4]==READY || [swapper_pte + 4]==RUNNING || [swapper_pte + 4]==CREATED) then
     //Schedule swapper daemon
     newPID = 15;
   endif;
 else
-  iter = 1;
-  // Loops till end of process table
-  while (iter<=15) do
-      if (temp_pid<15) then
-        temp_pid = temp_pid + 1;
-      else
-        temp_pid = 1;
-      endif;
-
-      //Excluding swapper daemon
-      if (temp_pid == 15) then
-        iter = iter + 1;
-        continue;
-      endif;
-      
-      pte = PROCESS_TABLE + temp_pid*16;
-      temp_state = [pte + 4];
-      if ( (temp_state == CREATED || temp_state == READY) && [pte+6]==0 ) then
-            newPID = temp_pid;
-            break;
-      endif;
-      iter = iter + 1;
+  //paging off select non swapped process excluding swapper daemon
+  while(temp_pid < 15) do
+    alias temp R4;
+    temp = PROCESS_TABLE + temp_pid*16;
+    if((([temp + 4] == READY) || ([temp + 4] == CREATED)) && ([temp + 6] == 0)) then
+      newPID=temp_pid;
+      break;
+    endif;
+    temp_pid = temp_pid + 1;
   endwhile;
 endif;
 
@@ -72,7 +58,7 @@ PTLR = [new_process_table + 15];
 if ([new_process_table + 4] == CREATED) then
     SP = [new_process_table + 13];
     //Setting BP to the value stored at the beginning of the kernel stack
-    BP = [[new_process_table + 11]*512 + [new_process_table + 12]];
+    BP = [[new_process_table + 11]*512];
     [new_process_table + 4] = RUNNING;
     // Mode flag to 0
     [new_process_table + 9] = 0;
@@ -83,7 +69,6 @@ endif;
 [new_process_table + 4] = RUNNING;
 
 //Restoring BP from kernel stack
-BP = [SP];
-SP = SP - 1;
+multipop(BP);
 
 return;

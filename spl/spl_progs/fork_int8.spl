@@ -150,6 +150,7 @@ while (iter<8) do
   iter = iter + 1;
 endwhile;
 
+
 //Copying contents of parent user stack  to child user stack
 iter = 0;
 while(iter<512) do
@@ -162,8 +163,7 @@ endwhile;
 [page_table_child + 19] = [PTBR + 19];
 
 //Storing value in BP register on top of the child kernel stack
-[child_pt_entry + 12] = [child_pt_entry + 12] + 1;
-[[child_pt_entry + 11]*512 + [child_pt_entry + 12]] = BP;
+[[child_pt_entry + 11]*512] = BP;
 
 //Setting return value of child process
 alias childUserSP R6;

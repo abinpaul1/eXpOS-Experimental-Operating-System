@@ -6,7 +6,7 @@ if (functionNum == 1) then
 
   iter = 3;
   while (iter<16) do
-    if ([PROCESS_TABLE + iter*16 + 4] == WAIT_PROCESS) then
+    if ( [PROCESS_TABLE + iter*16 + 4] == WAIT_PROCESS && [PROCESS_TABLE + iter*16 + 6] == 0 ) then
       break;
     endif;
     iter = iter + 1;
@@ -15,7 +15,7 @@ if (functionNum == 1) then
   if (iter==16) then
     iter = 3;
     while (iter<16) do
-      if ([PROCESS_TABLE + iter*16 + 4] == WAIT_SEMAPHORE) then
+      if ([PROCESS_TABLE + iter*16 + 4] == WAIT_SEMAPHORE && [PROCESS_TABLE + iter*16 + 6] == 0) then
         break;
       endif;
       iter = iter + 1;
@@ -30,13 +30,11 @@ if (functionNum == 1) then
 		max_tick = 0;
     while (iter<16) do
       //If not swapped (swap flag = 0)
-      alias pte R6;
-      pte = PROCESS_TABLE + iter*16;
-      if ([pte + 6] == 0 && [pte]>MAX_TICK && iter!=[SYSTEM_STATUS_TABLE+1]) then
-        if ([pte+4]!=RUNNING && [pte+4]!=TERMINATED && [pte+4]!=ALLOCATED) then
-          max_tick = [pte];
-          req_pid = iter;
-        endif;
+      alias process_table R6;
+      process_table = PROCESS_TABLE + (16 * iter);
+      if(([process_table + 6] == 0) && ([process_table] > max_tick) && (([process_table + 4] != RUNNING) && ([process_table + 4] != TERMINATED) && ([process_table + 4] != ALLOCATED))) then
+        max_tick = [process_table];
+        req_pid = iter;
       endif;
       iter = iter + 1;
     endwhile;
@@ -59,19 +57,24 @@ if (functionNum == 1) then
 
   iter = 2;
   while (iter<10) do
-    //Deallocating valid code pages
-    if ( iter<6 && [pt_entry+iter*2+1]!="0000") then
-      //Calling release page
-      multipush(R0,R1,R3,R4,R5);
-      R1 = 2;
-      R2 = [pt_entry + iter*2];
-      call MOD_2;
-      multipop(R0,R1,R3,R4,R5);
-      [pt_entry+iter*2+1]="0000";
+    if ([pt_entry+iter*2+1]=="0000" || [pt_entry+iter*2]==-1) then
+      iter = iter + 1;
+      continue;
     endif;
 
+    ////Deallocating valid code pages
+    //if (iter>3 && iter<8) then
+      ////Calling release page
+      //multipush(R0,R1,R3,R4,R5);
+      //R1 = 2;
+      //R2 = [pt_entry + iter*2];
+      //call MOD_2;
+      //multipop(R0,R1,R3,R4,R5);
+      //[pt_entry+iter*2+1]="0000";
+    //endif;
+
     //Swapping out non shared heap pages and stack pages
-    if ( iter>5 && [pt_entry+iter*2+1]!="0000" )then
+    if ( iter==2 || iter==3 || iter==8 || iter==9 )then
       alias heap_page R6;
       heap_page = [pt_entry + iter*2];
       //If heap page is not shared or page is a stack page
@@ -84,9 +87,6 @@ if (functionNum == 1) then
         swap_block = R0;
         multipop(R0,R1,R3,R4,R5,R6);
 
-        //Updating disk map table
-        [DISK_MAP_TABLE + swap_pid*10 + iter] = swap_block;
-
         //Storing to disk
         multipush(R0,R1,R3,R4,R5,R6,R7);
         R1 = 1;
@@ -96,6 +96,9 @@ if (functionNum == 1) then
         call MOD_4;
         multipop(R0,R1,R3,R4,R5,R6,R7);
 
+        //Updating disk map table
+        [DISK_MAP_TABLE + swap_pid*10 + iter] = swap_block;
+
         //Releasing the page
         multipush(R0,R1,R3,R4,R5,R6,R7);
         R1 = 2;
@@ -104,6 +107,7 @@ if (functionNum == 1) then
         multipop(R0,R1,R3,R4,R5,R6,R7);
 
         //Invalidating the Page table entries
+        [pt_entry+iter*2] = -1;
         [pt_entry+iter*2+1]="0000";
       endif;
     endif;
@@ -137,7 +141,7 @@ if (functionNum == 2) then
     alias pte R6;
     pte = PROCESS_TABLE + iter*16;
     //If swapped (swap flag = 1) and in ready state
-    if ([pte + 6] == 1 && [pte+4]==READY && [pte]>max_tick) then
+    if ([pte + 6] == 1 && [pte]>max_tick) then
       max_tick = [pte];
       req_pid = iter;
     endif;
@@ -157,10 +161,10 @@ if (functionNum == 2) then
   alias dmt_entry R6;
   dmt_entry = DISK_MAP_TABLE + req_pid*10;
 
-  iter = 6;
+  iter = 2;
   while(iter<10) do
     //If heap page is swapped out or for stack pages
-    if ( (iter==8 || iter==9) || ((iter==6 || iter==7) && [dmt_entry + iter]!=-1) )then
+    if ((iter==8 || iter==9 || iter==2 || iter==3) && [dmt_entry + iter]!=-1 )then
       //Getting free page
       alias free_page R7;
       multipush(R0,R1,R3,R4,R5,R6);
@@ -169,14 +173,16 @@ if (functionNum == 2) then
       free_page = R0;
       multipop(R0,R1,R3,R4,R5,R6);
 
-      //Loading the required disk block
-      multipush(R0,R1,R3,R4,R5,R6,R7);
-      R1 = 2;
-      R2 = [SYSTEM_STATUS_TABLE + 1];
-      R4 = [dmt_entry + iter];
-      R3 = free_page;
-      call MOD_4;
-      multipop(R0,R1,R3,R4,R5,R6,R7);
+      if (free_page != -1) then
+        //Loading the required disk block
+        multipush(R0,R1,R3,R4,R5,R6,R7);
+        R1 = 2;
+        R2 = [SYSTEM_STATUS_TABLE + 1];
+        R4 = [dmt_entry + iter];
+        R3 = free_page;
+        call MOD_4;
+        multipop(R0,R1,R3,R4,R5,R6,R7);
+      endif;
 
       //Freeing the swap block--disk
       multipush(R0,R1,R3,R4,R5,R6,R7);

@@ -3,14 +3,13 @@ alias functionNum R1;
 
 //Get free page
 if (functionNum == 1) then
-  alias currentPID R2;
-  currentPID = [SYSTEM_STATUS_TABLE + 1];
+  label:
   //Incrementing WAIT_MEM_COUNT
   [SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] + 1;
 
   //While memory is full -- MEM_FREE_COUNT = 0
   while ([SYSTEM_STATUS_TABLE + 2]==0) do
-    [PROCESS_TABLE + currentPID*16 + 4]=WAIT_MEM;
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 4]=WAIT_MEM;
     //Scheduling other process
     backup;
     call MOD_5;
@@ -24,23 +23,23 @@ if (functionNum == 1) then
   [SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
 
   //Finding free page in memory free list
-  alias iter R3;
+  alias iter R0;
   iter = 76;
   while(iter<128) do
     if ( [MEMORY_FREE_LIST + iter] == 0) then
-      break;
+      //Setting entry to 1 and returning the page number
+      [MEMORY_FREE_LIST + iter] = 1;
+      return;
     endif;
     iter = iter + 1;
   endwhile;
-  //Setting entry to 1 and returning the page number
-  [MEMORY_FREE_LIST + iter] = 1;
-  R0 = iter;
-  return;
+  goto label;
 endif;
 
 
 //Release page
 if (functionNum == 2) then
+  backup;
   alias pageNumToRelease R2;
   //Decrease entry in MEMORY_FREE_LIST
   [MEMORY_FREE_LIST + pageNumToRelease] = [MEMORY_FREE_LIST + pageNumToRelease] - 1;
@@ -48,26 +47,23 @@ if (functionNum == 2) then
   if ([MEMORY_FREE_LIST + pageNumToRelease] == 0) then
     //Incrementing MEM_FREE_COUNT
     [SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] + 1;
+    //Setting processs in WAIT_MEM to READY
+    alias iter R3;
+    iter = 0;
+    while(iter<16) do
+      if ([PROCESS_TABLE + iter*16 + 4]==WAIT_MEM) then
+        [PROCESS_TABLE + iter*16 + 4] = READY;
+      endif;
+      iter = iter + 1;
+    endwhile;
   endif;
-
-  // ?? Doesn't mem free list entry have to be zero for process to acquire that mem??
-  //Setting processs in WAIT_MEM to READY
-  alias iter R3;
-  iter = 0;
-  while(iter<16) do
-    if ([PROCESS_TABLE + iter*16 + 4]==WAIT_MEM) then
-      //?? Validating PID -- not necessary??
-      [PROCESS_TABLE + iter*16 + 4] = READY;
-    endif;
-    iter = iter + 1;
-  endwhile;
-
+  restore;
   return;
 endif;
 
 //Get free block
 if (functionNum == 3) then
-  alias iter R2;
+  alias iter R3;
   iter = DISK_FREE_AREA;
   while (iter<DISK_SWAP_AREA) do
     //If a block is free
@@ -87,16 +83,14 @@ endif;
 
 //Release block
 if (functionNum == 4) then
-    alias blockNum R2;
-    alias pid R3;
-    [DISK_FREE_LIST + blockNum] = 0;
+  alias blockNum R2;
+  [DISK_FREE_LIST + blockNum] = [DISK_FREE_LIST + blockNum] - 1;
   return;
 endif;
 
 //Get code page
 if (functionNum == 5) then
   alias blockNum R2;
-  alias currentPID R3;
   //Checking disk map entries of all process for block number
   alias iter R4;
   iter = 0;
@@ -128,7 +122,7 @@ if (functionNum == 5) then
   //Disk load function in device manager module
   R1 = 2;
   R4 = blockNum; //R4 = R2
-  R2 = currentPID;// R2 = R3
+  R2 = [SYSTEM_STATUS_TABLE+1];
   R3 = free_page; //R3 = R6
 
   call MOD_4;
@@ -141,7 +135,7 @@ endif;
 
 //Get swap block
 if (functionNum==6) then
-  alias iter R2;
+  alias iter R3;
   iter = DISK_SWAP_AREA;
   while (iter<DISK_SIZE) do
     //If a block is free
