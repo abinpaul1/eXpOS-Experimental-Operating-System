@@ -29,9 +29,6 @@ int main()
 			endwhile;
 		endif;
 
-    temp = exposcall("Remusr",remUser);
-    write(temp);
-
 		return 0;
 	end
 }
