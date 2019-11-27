@@ -1,0 +1,272 @@
+alias userSP R0;
+userSP = SP;
+
+alias currentPID R1;
+currentPID = [SYSTEM_STATUS_TABLE + CORE*5 + 1];
+
+// SP value is stored in UPTR field of process table
+[PROCESS_TABLE + currentPID*16 + 13] = SP;
+
+// Changing to kernel stack
+SP = [PROCESS_TABLE + currentPID*16 + 11]*512 - 1;
+
+//Acquire kernel lock
+backup;
+R1 = 1;
+call MOD_8;
+restore;
+
+//Extracting system call numebr from user stack -- value in userSP-5
+alias sys_call_num R2;
+sys_call_num = [[PTBR + 2*((userSP-5)/512)]*512 + (userSP-5)%512];
+
+//Setting mode flag
+[PROCESS_TABLE + currentPID*16 + 9] = sys_call_num;
+
+alias ret_phy_addr R13;
+ret_phy_addr = [PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512;
+
+//Open
+if (sys_call_num==2) then
+  alias file_name R3;
+  file_name = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+  alias user_area_page_num R4;
+  user_area_page_num = [PROCESS_TABLE + currentPID*16 + 11];
+
+  //Finding index of free entry from Per-process resource table
+  alias iter R5;
+  iter = 0;
+  while (iter<8) do
+    //Last 16 words of the User Area Page is used for per process resource table
+    if ([user_area_page_num*512 + 496 + 2*iter] == -1 ) then
+      break;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  //If no free entry exists
+  if (iter==8) then
+    //Storing return value in stack
+    [ret_phy_addr] = -3;
+    //Release kernel lock
+    backup;
+    R1 = 4;
+    R2 = KERN_LOCK;
+    call MOD_8;
+    restore;
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    ireturn;
+  endif;
+
+  alias free_index R6;
+  free_index = iter;
+
+  alias open_tab_index R7;
+  //Calling open function
+  multipush(R13,R0,R1,R2,R3,R4,R5,R6);
+  R1 = 3;
+  R2 = file_name;
+  call MOD_3;
+  open_tab_index = R0;
+  multipop(R13,R0,R1,R2,R3,R4,R5,R6);
+
+  //Returning error code if failed
+  if ( (open_tab_index == -1) || (open_tab_index==-2) )then
+    //Storing return value in stack
+    [ret_phy_addr] = open_tab_index;
+    //Release kernel lock
+    backup;
+    R1 = 4;
+    R2 = KERN_LOCK;
+    call MOD_8;
+    restore;
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    ireturn;
+  endif;
+
+  //Setting per process resource table entry
+  //Setting resource identifier field to 0--FILE
+  [user_area_page_num*512 + 496 + 2*free_index] = 0;
+  //Storing open file table index in Per process resource table
+  [user_area_page_num*512 + 496 + 2*free_index + 1] = open_tab_index;
+
+  //Storing return value in stack
+  [ret_phy_addr] = free_index;
+  //Release kernel lock
+  backup;
+  R1 = 4;
+  R2 = KERN_LOCK;
+  call MOD_8;
+  restore;
+  SP = [PROCESS_TABLE + currentPID*16 + 13];
+  //Mode field reset to 0
+  [PROCESS_TABLE + currentPID*16 + 9] = 0;
+  ireturn;
+endif;
+
+//Close
+if (sys_call_num==3) then
+  alias file_desc R3;
+  file_desc = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+  alias res_table_entry R4;
+  res_table_entry = [PROCESS_TABLE + currentPID*16 + 11]*512 + 496 + 2*file_desc;
+
+  //If file descriptor is invalid or does not indicate file--0
+  if ( (file_desc<0) || (file_desc>7) || ([res_table_entry]!=0) ) then
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    //Storing return value in stack
+    [ret_phy_addr] = -1;
+    //Release kernel lock
+    backup;
+    R1 = 4;
+    R2 = KERN_LOCK;
+    call MOD_8;
+    restore;
+    ireturn;
+  endif;
+
+  //Calling close function
+  backup;
+  R1 = 4;
+  // R2 has the open file table index
+  R2 = [res_table_entry + 1];
+  call MOD_3;
+  restore;
+
+  //Invalidating per process resource table entry
+  [res_table_entry] = -1;
+
+  SP = [PROCESS_TABLE + currentPID*16 + 13];
+  //Mode field reset to 0
+  [PROCESS_TABLE + currentPID*16 + 9] = 0;
+  //Storing return value in stack
+  [ret_phy_addr] = 0;
+  //Release kernel lock
+  backup;
+  R1 = 4;
+  R2 = KERN_LOCK;
+  call MOD_8;
+  restore;
+  ireturn;
+endif;
+
+//Seek
+if (sys_call_num==6) then
+  alias file_desc R3;
+  file_desc = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+  alias res_table_entry R4;
+  res_table_entry = [PROCESS_TABLE + currentPID*16 + 11]*512 + 496 + 2*file_desc;
+
+  //If file descriptor is invalid or does not indicate file--0
+  if ( (file_desc<0) || (file_desc>7) || ([res_table_entry]!=0) ) then
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    //Storing return value in stack
+    [ret_phy_addr] = -1;
+    //Release kernel lock
+    backup;
+    R1 = 4;
+    R2 = KERN_LOCK;
+    call MOD_8;
+    restore;
+    ireturn;
+  endif;
+
+  alias open_tab_index R5;
+  open_tab_index = [res_table_entry + 1];
+
+  alias open_tab_entry R11;
+  open_tab_entry = OPEN_FILE_TABLE + open_tab_index*4;
+
+  alias inode_index R6;
+  inode_index = [open_tab_entry];
+
+  //Acquiring inode
+  multipush(R13,R0,R1,R2,R3,R5,R6,R11);
+  R1 = 4;
+  R2 = [SYSTEM_STATUS_TABLE + CORE*5 + 1];
+  R3 = inode_index;
+  call MOD_0;
+  R7 = R0; //R7 temporarily holds return value
+  multipop(R13,R0,R1,R2,R3,R5,R6,R11);
+
+  //If Acquiring failed, return -1
+  if (R7 == -1) then
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    //Storing return value in stack
+    [ret_phy_addr] = -1;
+    //Release kernel lock
+    backup;
+    R1 = 4;
+    R2 = KERN_LOCK;
+    call MOD_8;
+    restore;
+    ireturn;
+  endif;
+
+  alias lseek_pos R7;
+  lseek_pos = [open_tab_entry + 2];
+
+  alias offset R8;
+  offset = [[PTBR + 2*((userSP-3)/512)]*512 + (userSP-3)%512];
+  //Checking validity of given offset
+
+  alias file_size R9;
+  if (inode_index == INODE_ROOT) then
+    file_size = 480;
+  else
+    file_size = [INODE_TABLE + inode_index*16 + 2];
+  endif;
+
+  //R12 temporarily stores return value
+  if ( (lseek_pos + offset)<0 ) then
+    R12 = -2;
+  else
+    if (offset == 0) then
+      //Setting lseek to beginning
+      [open_tab_entry + 2] = 0;
+    else
+      if ( (lseek_pos + offset) > file_size ) then
+        [open_tab_entry + 2] = file_size;
+      else
+        [open_tab_entry + 2] = lseek_pos + offset;
+      endif;
+    endif;
+    R12 = 0;
+  endif;
+
+  //Storing return value in stack
+  [ret_phy_addr] = R12;
+
+  //Releasing inode
+  backup;
+  R1 = 5;
+  R2 = [SYSTEM_STATUS_TABLE + CORE*5 + 1];
+  R3 = inode_index;
+  call MOD_0;
+  restore;
+
+  //Release kernel lock
+  backup;
+  R1 = 4;
+  R2 = KERN_LOCK;
+  call MOD_8;
+  restore;
+
+  SP = userSP;
+  // Mode field to 0
+  [PROCESS_TABLE + currentPID*16 + 9] = 0;
+  ireturn;
+endif;

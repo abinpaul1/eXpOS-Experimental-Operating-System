@@ -1,0 +1,108 @@
+alias userSP R0;
+userSP = SP;
+
+alias currentPID R2;
+currentPID = [SYSTEM_STATUS_TABLE + 5*CORE + 1];
+// SP value is stored in UPTR field of process table
+[PROCESS_TABLE + currentPID*16 + 13] = SP;
+
+// Changing to kernel stack
+SP = [PROCESS_TABLE + currentPID*16 + 11]*512 - 1;
+
+//Setting mode flag
+[PROCESS_TABLE + currentPID*16 + 9] = 21;
+
+//Acquire kernel lock
+backup;
+R1 = 1;
+call MOD_8;
+restore;
+
+//If current process is not shell or current user is not root
+if ( (currentPID!=2) || ([SYSTEM_STATUS_TABLE]!=ROOT) ) then
+  //Release kernel lock
+  backup;
+  R1 = 4;
+  R2 = KERN_LOCK;
+  call MOD_8;
+  restore;
+
+  SP = userSP;
+  //Mode field reset to 0
+  [PROCESS_TABLE + currentPID*16 + 9] = 0;
+  //Storing return value in stack
+  [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+  ireturn;
+endif;
+
+reset;
+[ACCESS_LOCK_TABLE + 1] = 0;	//sched_lock to 0
+
+//Calling kill all function
+multipush(R0,R2);
+R1 = 5;
+R2 = currentPID;
+call MOD_1;
+multipop(R0,R2);
+
+
+//Storing modified data in buffer to disk
+alias iter R5;
+iter = 0;
+//Looping through buffer table
+while(iter<4) do
+  if ([BUFFER_TABLE + iter*4 + 1] == 1) then
+    //Commiting changes to disk
+    multipush(R0,R2,R5);
+    R1 = 1;
+    R2 = currentPID;
+    R3 = 71 + iter;
+    R4 = [BUFFER_TABLE + iter*4];
+    call MOD_4;
+    multipop(R0,R2,R5);
+  endif;
+  iter = iter + 1;
+endwhile;
+
+//Storing inode table, user table to disk
+multipush(R0,R2,R5);
+R1 = 1;
+R2 = currentPID;
+R3 = 59;
+R4 = 3;
+call MOD_4;
+multipop(R0,R2,R5);
+
+multipush(R0,R2,R5);
+R1 = 1;
+R2 = currentPID;
+R3 = 60;
+R4 = 4;
+call MOD_4;
+multipop(R0,R2,R5);
+
+//Storing root file, disk free list
+multipush(R0,R2,R5);
+R1 = 1;
+R2 = currentPID;
+R3 = 62;
+R4 = 5;
+call MOD_4;
+multipop(R0,R2,R5);
+
+multipush(R0,R2,R5);
+R1 = 1;
+R2 = currentPID;
+R3 = 61;
+R4 = 2;
+call MOD_4;
+multipop(R0,R2,R5);
+
+//Release kernel lock
+backup;
+R1 = 4;
+R2 = KERN_LOCK;
+call MOD_8;
+restore;
+
+halt;

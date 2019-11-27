@@ -1,0 +1,175 @@
+alias userSP R0;
+userSP = SP;
+
+
+// SP value is stored in UPTR field of process table
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] = SP;
+
+// Changing to kernel stack
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11]*512 - 1;
+
+//Extracting system call numebr from user stack -- value in userSP-5
+alias sys_call_num R1;
+sys_call_num = [[PTBR + 2*((userSP-5)/512)]*512 + (userSP-5)%512];
+
+//Acquire kernel lock
+backup;
+R1 = 1;
+call MOD_8;
+restore;
+
+//SemLock
+if (sys_call_num==19) then
+
+  alias sem_id R2;
+  alias currentPID R3;
+  alias res_table_entry R4;
+
+  sem_id = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+  currentPID = [SYSTEM_STATUS_TABLE + 1];
+
+  //Setting mode flag to 19
+  [PROCESS_TABLE + currentPID*16 + 9] = 19;
+
+  res_table_entry = [PROCESS_TABLE + currentPID*16 + 11]*512 + 496 + 2*sem_id;
+
+
+  if ( (sem_id<0) || (sem_id>7) || ([res_table_entry]!=SEMAPHORE) ) then
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    //Storing return value in stack
+    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+    //Release kernel lock
+    backup;
+    R1 = 4;
+    R2 = KERN_LOCK;
+    call MOD_8;
+    restore;
+    ireturn;
+  endif;
+
+  alias sem_table_index R5;
+  sem_table_index = [res_table_entry + 1];
+
+  if ([SEMAPHORE_TABLE + sem_table_index*4] != -1) then
+    while ([SEMAPHORE_TABLE + sem_table_index*4] != -1) do
+      [PROCESS_TABLE + currentPID*16 + 4] = WAIT_SEMAPHORE;
+      [PROCESS_TABLE + currentPID*16 + 5] = sem_table_index;
+      //Release kernel lock
+      backup;
+      R1 = 4;
+      R2 = KERN_LOCK;
+      call MOD_8;
+      restore;
+      backup;
+      call MOD_5;
+      restore;
+      //Acquire kernel lock
+      backup;
+      R1 = 1;
+      call MOD_8;
+      restore;
+    endwhile;
+  endif;
+
+  //Changing locking PID to current process
+  [SEMAPHORE_TABLE + sem_table_index*4] = [SYSTEM_STATUS_TABLE + 1];
+
+  SP = [PROCESS_TABLE + currentPID*16 + 13];
+  //Mode field reset to 0
+  [PROCESS_TABLE + currentPID*16 + 9] = 0;
+  //Storing return value in stack
+  [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = 0;
+  //Release kernel lock
+  backup;
+  R1 = 4;
+  R2 = KERN_LOCK;
+  call MOD_8;
+  restore;
+  ireturn;
+endif;
+
+
+//SemUnlock
+if (sys_call_num==20) then
+
+  alias sem_id R2;
+  alias currentPID R3;
+  alias res_table_entry R4;
+
+  sem_id = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+  currentPID = [SYSTEM_STATUS_TABLE + 1];
+  res_table_entry = [PROCESS_TABLE + currentPID*16 + 11]*512 + 496 + 2*sem_id;
+
+  //Setting mode flag to 20
+  [PROCESS_TABLE + currentPID*16 + 9] = 20;
+
+  if ( (sem_id<0) || (sem_id>7) || ([res_table_entry]!=SEMAPHORE) ) then
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    //Storing return value in stack
+    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+    //Release kernel lock
+    backup;
+    R1 = 4;
+    R2 = KERN_LOCK;
+    call MOD_8;
+    restore;
+    ireturn;
+  endif;
+
+  alias sem_table_index R5;
+  sem_table_index = [res_table_entry + 1];
+
+  //If semaphore is locked
+  if ( [SEMAPHORE_TABLE + sem_table_index*4] != -1) then
+    //If current process hasn't locked the semaphore
+    if ( [SEMAPHORE_TABLE + sem_table_index*4] != currentPID) then
+      SP = userSP;
+      //Mode field reset to 0
+      [PROCESS_TABLE + currentPID*16 + 9] = 0;
+      //Storing return value in stack
+      [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -2;
+      //Release kernel lock
+      backup;
+      R1 = 4;
+      R2 = KERN_LOCK;
+      call MOD_8;
+      restore;
+      ireturn;
+    endif;
+
+    //Setting locking PID to -1 -- unlocking
+    [SEMAPHORE_TABLE + sem_table_index*4] = -1;
+
+    //Changing process table entries
+    alias iter R6;
+    iter = 0;
+    while(iter<16) do
+      if ( [PROCESS_TABLE + iter*16 + 4] == WAIT_SEMAPHORE ) then
+        if ( [PROCESS_TABLE + iter*16 + 5] == sem_table_index) then
+          [PROCESS_TABLE + iter*16 + 4] = READY;
+          [PROCESS_TABLE + iter*16 + 5] = -1;
+        endif;
+      endif;
+      iter = iter + 1;
+    endwhile;
+  endif;
+
+  SP = [PROCESS_TABLE + currentPID*16 + 13];
+  //Mode field reset to 0
+  [PROCESS_TABLE + currentPID*16 + 9] = 0;
+  //Storing return value in stack
+  [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = 0;
+  //Release kernel lock
+  backup;
+  R1 = 4;
+  R2 = KERN_LOCK;
+  call MOD_8;
+  restore;
+  ireturn;
+endif;

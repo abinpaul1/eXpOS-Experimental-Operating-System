@@ -1,0 +1,157 @@
+alias userSP R0;
+userSP = SP;
+
+
+// SP value is stored in UPTR field of process table
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + CORE*5 + 1]*16 + 13] = SP;
+
+// Changing to kernel stack
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + CORE*5 + 1]*16 + 11]*512 - 1;
+
+//Extracting system call numebr from user stack -- value in userSP-5
+alias sys_call_num R1;
+sys_call_num = [[PTBR + 2*((userSP-5)/512)]*512 + (userSP-5)%512];
+
+//Acquire kernel lock
+backup;
+R1 = 1;
+call MOD_8;
+restore;
+
+//Semget
+if (sys_call_num==17) then
+  alias currentPID R2;
+  currentPID = [SYSTEM_STATUS_TABLE + CORE*5 + 1];
+
+  //Setting mode flag to 17
+  [PROCESS_TABLE + currentPID*16 + 9] = 17;
+
+  alias user_area_page_num R3;
+  user_area_page_num = [PROCESS_TABLE + currentPID*16 + 11];
+
+  //Finding index of free entry from Per-process resource table
+  alias iter R4;
+  iter = 0;
+  while (iter<8) do
+    //Last 16 words of the User Area Page is used for per process resource table
+    if ([user_area_page_num*512 + 496 + 2*iter] == -1 ) then
+      break;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  if (iter==8) then
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    //Storing return value in stack
+    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+    //Release kernel lock
+    backup;
+    R1 = 4;
+    R2 = KERN_LOCK;
+    call MOD_8;
+    restore;
+    ireturn;
+  endif;
+
+  alias free_index R5;
+  free_index = iter;
+  //Setting resource identifier field to 1
+  [user_area_page_num*512 + 496 + 2*free_index] = 1;
+
+  alias sem_table_index R6;
+  //Calling Acquire semaphore
+  multipush(R0,R1,R2,R3,R4,R5);
+  R1 = 6;
+  R2 = currentPID;
+  call MOD_0;
+  sem_table_index = R0;
+  multipop(R0,R1,R2,R3,R4,R5);
+
+  //If there are no free semaphores
+  if (sem_table_index==-1) then
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    //Storing return value in stack
+    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -2;
+    //Release kernel lock
+    backup;
+    R1 = 4;
+    R2 = KERN_LOCK;
+    call MOD_8;
+    restore;
+    ireturn;
+  endif;
+
+  //Storing semaphore index in Per process resource table
+  [user_area_page_num*512 + 496 + 2*free_index + 1] = sem_table_index;
+
+  SP = [PROCESS_TABLE + currentPID*16 + 13];
+  //Mode field reset to 0
+  [PROCESS_TABLE + currentPID*16 + 9] = 0;
+  //Storing return value in stack
+  [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = free_index;
+  //Release kernel lock
+  backup;
+  R1 = 4;
+  R2 = KERN_LOCK;
+  call MOD_8;
+  restore;
+  ireturn;
+endif;
+
+
+//Semrelease
+if (sys_call_num == 18) then
+  alias sem_id R2;
+  alias currentPID R3;
+  alias res_table_entry R4;
+
+  sem_id = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+  currentPID = [SYSTEM_STATUS_TABLE + CORE*5 + 1];
+  res_table_entry = [PROCESS_TABLE + currentPID*16 + 11]*512 + 496 + 2*sem_id;
+
+  //Setting mode flag to 18
+  [PROCESS_TABLE + currentPID*16 + 9] = 18;
+
+  if ( (sem_id<0) || (sem_id>7) || ([res_table_entry]!=1) ) then
+    SP = userSP;
+    //Mode field reset to 0
+    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    //Storing return value in stack
+    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+    //Release kernel lock
+    backup;
+    R1 = 4;
+    R2 = KERN_LOCK;
+    call MOD_8;
+    restore;
+    ireturn;
+  endif;
+
+  multipush(R0,R1,R2,R3,R4);
+  R1 = 7;
+  R2 = currentPID;
+  R3 = [res_table_entry + 1];
+  call MOD_0;
+  multipop(R0,R1,R2,R3,R4);
+
+  //Invalidating per process resource table entry
+  [res_table_entry] = -1;
+
+  SP = [PROCESS_TABLE + currentPID*16 + 13];
+  //Mode field reset to 0
+  [PROCESS_TABLE + currentPID*16 + 9] = 0;
+  //Storing return value in stack
+  [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = 0;
+  //Release kernel lock
+  backup;
+  R1 = 4;
+  R2 = KERN_LOCK;
+  call MOD_8;
+  restore;
+  ireturn;
+endif;

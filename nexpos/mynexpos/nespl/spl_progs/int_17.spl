@@ -1,0 +1,131 @@
+alias userSP R0;
+userSP = SP;
+
+//Setting mode flag to 27
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + CORE*5 + 1]*16 + 9] = 27;
+
+// SP value is stored in UPTR field of process table
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + CORE*5 + 1]*16 + 13] = SP;
+
+// Changing to kernel stack
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + CORE*5 + 1]*16 + 11]*512 - 1;
+
+alias ret_phy_addr R1;
+ret_phy_addr = [PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512;
+
+alias user_name R3;
+user_name = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+alias pwd R4;
+pwd = [[PTBR + 2*((userSP-3)/512)]*512 + (userSP-3)%512];
+
+//Acquire kernel lock
+backup;
+R1 = 1;
+call MOD_8;
+restore;
+
+// If current process is not login process
+if ([SYSTEM_STATUS_TABLE + CORE*5 + 1] != 1) then
+  SP = userSP;
+  //Mode field reset to 0
+  [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + CORE*5 + 1]*16 + 9] = 0;
+  //Storing return value in stack
+  [ret_phy_addr] = -2;
+  //Release kernel lock
+  backup;
+  R1 = 4;
+  R2 = KERN_LOCK;
+  call MOD_8;
+  restore;
+  ireturn;
+endif;
+
+alias iter R2;
+iter = 0;
+alias user_tab_ind R5;
+
+while (iter<MAX_USER_NUM) do
+  if ( [USER_TABLE + iter*2] == user_name ) then
+    break;
+  endif;
+  iter = iter + 1;
+endwhile;
+
+//If an entry does not exist
+if (iter == MAX_USER_NUM) then
+  SP = userSP;
+  //Mode field reset to 0
+  [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + CORE*5 + 1]*16 + 9] = 0;
+  //Storing return value in stack
+  [ret_phy_addr] = -1;
+  //Release kernel lock
+  backup;
+  R1 = 4;
+  R2 = KERN_LOCK;
+  call MOD_8;
+  restore;
+  ireturn;
+endif;
+
+user_tab_ind = iter;
+
+encrypt pwd;
+
+//If encrypted passwords dont match
+if (pwd != [USER_TABLE + user_tab_ind*2 + 1]) then
+  SP = userSP;
+  //Mode field reset to 0
+  [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + CORE*5 + 1]*16 + 9] = 0;
+  //Storing return value in stack
+  [ret_phy_addr] = -1;
+  //Release kernel lock
+  backup;
+  R1 = 4;
+  R2 = KERN_LOCK;
+  call MOD_8;
+  restore;
+  ireturn;
+endif;
+
+//Setting state,user_id of shell process
+[PROCESS_TABLE + 2*16 + 4] = CREATED;
+[PROCESS_TABLE + 2*16 + 3] = user_tab_ind;
+
+//Set the state of the current process -- login waits for shell
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + CORE*5 + 1]*16 + 4] = WAIT_PROCESS;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + CORE*5 + 1]*16 + 5] = 2;
+
+//Updating system status table -- current user id
+[SYSTEM_STATUS_TABLE] = user_tab_ind;
+
+//Release kernel lock
+backup;
+R1 = 4;
+R2 = KERN_LOCK;
+call MOD_8;
+restore;
+
+//Invoking context switch
+backup;
+call MOD_5;
+restore;
+
+//Acquire kernel lock
+backup;
+R1 = 1;
+call MOD_8;
+restore;
+
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + CORE*5 + 1]*16 + 13];
+//Mode field reset to 0
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + CORE*5 + 1]*16 + 9] = 0;
+//Storing return value in stack
+[ret_phy_addr] = 0;
+//Release kernel lock
+backup;
+R1 = 4;
+R2 = KERN_LOCK;
+call MOD_8;
+restore;
+ireturn;

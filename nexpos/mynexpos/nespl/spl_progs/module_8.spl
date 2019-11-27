@@ -1,0 +1,74 @@
+alias functionNum R1;
+
+//Aquire kernel lock
+if (functionNum==1) then
+  //If core is secondary
+  if (CORE==1) then
+    //if secondary core and paging or logout_status is on, don't permit a process to execute critical code
+    if (([SYSTEM_STATUS_TABLE + 5] != 0) || ([SYSTEM_STATUS_TABLE + 7] == 1)) then
+      [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 5*CORE + 1]*16 + 4] = READY;
+      backup;
+      call MOD_5;
+      restore;
+    endif;
+  endif;
+
+  while(tsl(KERN_LOCK)==1) do
+    continue;
+  endwhile;
+  return;
+endif;
+
+//Acquire scheduler lock - TSL
+if (functionNum==2) then
+  while(tsl(SCHED_LOCK)==1) do
+    continue;
+  endwhile;
+  return;
+endif;
+
+//Acquire glock
+if (functionNum==3) then
+  while(tsl(GLOCK)==1) do
+    continue;
+  endwhile;
+  return;
+endif;
+
+//Release lock
+if (functionNum==4) then
+  alias LockVarAddress R2;
+  [LockVarAddress] = 0;
+  return;
+endif;
+
+//Acquire Scheduler Lock-Peterson
+if(functionNum == -1) then
+	//[143 * 512] denotes flag[0] for Primary Core
+	//[143 * 512 + 1] denotes flag[1] for Secondary Core
+	//[143 * 512 + 2] denotes interest
+	if(R2 == 0) then
+		[143 * 512] = 1;	//flag[0]
+		[143 * 512 + 2] = 1;	//interest
+		while(([143 * 512 + 1] == 1) && ([143 * 512 + 2] == 1)) do
+			continue;
+		endwhile;
+	else
+		[143 * 512 + 2] = 0;	//interest
+		[143 * 512 + 1] = 1;	//flag[1]
+		while(([143 * 512] == 1) && ([143 * 512 + 2] == 0)) do
+			continue;
+		endwhile;
+	endif;
+	return;
+endif;
+
+//Release Scheduler Lock-Peterson
+if(functionNum == 10) then
+	if(R2 == 0) then
+		[143 * 512] = 0;
+	else
+		[143 * 512 + 1] = 0;
+	endif;
+	return;
+endif;

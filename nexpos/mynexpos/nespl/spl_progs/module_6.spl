@@ -1,0 +1,216 @@
+alias functionNum R1;
+
+//Swap out
+if (functionNum == 1) then
+  alias iter R3;
+
+  iter = 3;
+  while (iter<16) do
+    if ( iter!=14 && [PROCESS_TABLE + iter*16 + 4] == WAIT_PROCESS && [PROCESS_TABLE + iter*16 + 6] == 0 ) then
+      break;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  if (iter==16) then
+    iter = 3;
+    while (iter<16) do
+      if ( iter!=14 && [PROCESS_TABLE + iter*16 + 4] == WAIT_SEMAPHORE && [PROCESS_TABLE + iter*16 + 6] == 0) then
+        break;
+      endif;
+      iter = iter + 1;
+    endwhile;
+  endif;
+
+  if (iter == 16) then
+    iter = 3;
+    alias req_pid R4;
+		alias max_tick R5;
+    req_pid = -1;
+		max_tick = 0;
+    while (iter<16) do
+      //If not swapped (swap flag = 0)
+      alias process_table R6;
+      process_table = PROCESS_TABLE + (16 * iter);
+      if( (iter!=14) && ([process_table + 6] == 0) && ([process_table] > max_tick) && (([process_table + 4] != RUNNING) && ([process_table + 4] != TERMINATED) && ([process_table + 4] != ALLOCATED))) then
+        max_tick = [process_table];
+        req_pid = iter;
+      endif;
+      iter = iter + 1;
+    endwhile;
+    iter = req_pid;
+  endif;
+
+  //If no such process
+  if (iter == -1) then
+    [SYSTEM_STATUS_TABLE + 5] = 0;
+    return;
+  endif;
+
+  alias swap_pid R4;
+  swap_pid = iter;
+  //When the process goes to swap TICK restarts
+  [PROCESS_TABLE + swap_pid*16] = 0;
+
+  alias pt_entry R5;
+  pt_entry = PAGE_TABLE_BASE + swap_pid*20;
+
+  iter = 2;
+  while (iter<10) do
+    if ([pt_entry+iter*2+1]=="0000" || [pt_entry+iter*2]==-1) then
+      iter = iter + 1;
+      continue;
+    endif;
+
+    ////Deallocating valid code pages
+    //if (iter>3 && iter<8) then
+      ////Calling release page
+      //multipush(R0,R1,R3,R4,R5);
+      //R1 = 2;
+      //R2 = [pt_entry + iter*2];
+      //call MOD_2;
+      //multipop(R0,R1,R3,R4,R5);
+      //[pt_entry+iter*2+1]="0000";
+    //endif;
+
+    //Swapping out non shared heap pages and stack pages
+    if ( iter==2 || iter==3 || iter==8 || iter==9 )then
+      alias heap_page R6;
+      heap_page = [pt_entry + iter*2];
+      //If heap page is not shared or page is a stack page
+      if ( iter==8 || iter==9 || [MEMORY_FREE_LIST + heap_page]==1) then
+        //Get free swap block
+        alias swap_block R7;
+        multipush(R0,R1,R3,R4,R5,R6);
+        R1=6;
+        call MOD_2;
+        swap_block = R0;
+        multipop(R0,R1,R3,R4,R5,R6);
+
+        //Storing to disk
+        multipush(R0,R1,R3,R4,R5,R6,R7);
+        R1 = 1;
+        R2 = [SYSTEM_STATUS_TABLE + CORE*5 + 1];
+        R3 = [pt_entry + iter*2];
+        R4 = swap_block;
+        call MOD_4;
+        multipop(R0,R1,R3,R4,R5,R6,R7);
+
+        //Updating disk map table
+        [DISK_MAP_TABLE + swap_pid*10 + iter] = swap_block;
+
+        //Releasing the page
+        multipush(R0,R1,R3,R4,R5,R6,R7);
+        R1 = 2;
+        R2 = [pt_entry + iter*2];
+        call MOD_2;
+        multipop(R0,R1,R3,R4,R5,R6,R7);
+
+        //Invalidating the Page table entries
+        [pt_entry+iter*2] = -1;
+        [pt_entry+iter*2+1]="0000";
+      endif;
+    endif;
+
+    iter = iter + 1;
+  endwhile;
+
+  //Updating swap flag of swapped process
+  [PROCESS_TABLE + swap_pid*16 + 6] = 1;
+
+  //Incrementing swap count
+  [SYSTEM_STATUS_TABLE + 4] = [SYSTEM_STATUS_TABLE + 4] + 1;
+  //Resetting paging status
+  [SYSTEM_STATUS_TABLE + 5] = 0;
+
+  return;
+endif;
+
+
+//Swap in
+if (functionNum == 2) then
+  alias iter R3;
+
+  iter = 3;
+  alias req_pid R4;
+  alias max_tick R5;
+  req_pid = -1;
+  max_tick = 0;
+  //Finding swapped procees with highest TICK
+  while (iter<16) do
+    alias pte R6;
+    pte = PROCESS_TABLE + iter*16;
+    //If swapped (swap flag = 1) and in ready state
+    if ([pte + 6] == 1 && [pte]>max_tick) then
+      max_tick = [pte];
+      req_pid = iter;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  //If no such process
+  if (req_pid == -1) then
+    //Resetting paging status
+    [SYSTEM_STATUS_TABLE + 5] = 0;
+    return;
+  endif;
+
+  //Setting tick field to 0
+  [PROCESS_TABLE + req_pid*16] = 0;
+
+  alias dmt_entry R6;
+  dmt_entry = DISK_MAP_TABLE + req_pid*10;
+
+  iter = 2;
+  while(iter<10) do
+    //If heap page is swapped out or for stack pages
+    if ((iter==8 || iter==9 || iter==2 || iter==3) && [dmt_entry + iter]!=-1 )then
+      //Getting free page
+      alias free_page R7;
+      multipush(R0,R1,R3,R4,R5,R6);
+      R1=1;
+      call MOD_2;
+      free_page = R0;
+      multipop(R0,R1,R3,R4,R5,R6);
+
+      if (free_page != -1) then
+        //Loading the required disk block
+        multipush(R0,R1,R3,R4,R5,R6,R7);
+        R1 = 2;
+        R2 = [SYSTEM_STATUS_TABLE + CORE*5 + 1];
+        R4 = [dmt_entry + iter];
+        R3 = free_page;
+        call MOD_4;
+        multipop(R0,R1,R3,R4,R5,R6,R7);
+      endif;
+
+      //Freeing the swap block--disk
+      multipush(R0,R1,R3,R4,R5,R6,R7);
+      R1 = 4;
+      R2 = [dmt_entry + iter];
+      R3 = [SYSTEM_STATUS_TABLE + CORE*5 + 1];
+      call MOD_2;
+      multipop(R0,R1,R3,R4,R5,R6,R7);
+
+      //Setting the Page table entry
+      alias ptbe R8;
+      ptbe = PAGE_TABLE_BASE + req_pid*20 + iter*2;
+      [ptbe]=free_page;
+      [ptbe + 1]="0110";
+
+      //Invalidating disk map table entry
+      [dmt_entry + iter] = -1;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  //Setting swap flag of swapped in process
+  [PROCESS_TABLE + req_pid*16 + 6] = 0;
+
+  //Decrementing swap count
+  [SYSTEM_STATUS_TABLE + 4] = [SYSTEM_STATUS_TABLE + 4] - 1;
+  //Resetting paging status
+  [SYSTEM_STATUS_TABLE + 5] = 0;
+
+  return;
+endif;

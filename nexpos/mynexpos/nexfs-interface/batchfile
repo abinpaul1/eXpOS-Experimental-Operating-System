@@ -1,0 +1,43 @@
+load --os=primary ../nespl/spl_progs/final_os_startup.xsm
+load --os=secondary ../nespl/spl_progs/secondary_bootstrap.xsm
+load --init ../expl/sample/login.xsm
+load --idle ../expl/sample/idle.xsm
+load --shell ../expl/sample/ExtShell.xsm
+load --exec ../expl/sample/ls.xsm
+load --exec ../expl/sample/cat.xsm
+load --exec ../expl/sample/cp.xsm
+load --exec ../expl/sample/rm.xsm
+load --exec ../expl/sample/lu.xsm
+load --exec ../expl/sample/ru.xsm
+load --exec ../expl/sample/m_merge.xsm
+load --exec ../expl/sample/m_sort.xsm
+load --exec ../expl/sample/m_store.xsm
+load --exec ../expl/sample/merge.xsm
+load --exhandler ../nespl/spl_progs/exception_handler.xsm
+load --library ../expl/library.lib
+load --int=timer ../nespl/spl_progs/timer_handler.xsm
+load --int=console ../nespl/spl_progs/console_interrupt.xsm
+load --int=disk ../nespl/spl_progs/disk_interrupt.xsm
+load --int=4 ../nespl/spl_progs/int_4.xsm
+load --int=5 ../nespl/spl_progs/int_5.xsm
+load --int=6 ../nespl/spl_progs/int_6.xsm
+load --int=7 ../nespl/spl_progs/int_7.xsm
+load --int=8 ../nespl/spl_progs/int_8.xsm
+load --int=9 ../nespl/spl_progs/int_9.xsm
+load --int=10 ../nespl/spl_progs/int_10.xsm
+load --int=11 ../nespl/spl_progs/int_11.xsm
+load --int=12 ../nespl/spl_progs/int_12.xsm
+load --int=13 ../nespl/spl_progs/int_13.xsm
+load --int=14 ../nespl/spl_progs/int_14.xsm
+load --int=15 ../nespl/spl_progs/int_15.xsm
+load --int=16 ../nespl/spl_progs/int_16.xsm
+load --int=17 ../nespl/spl_progs/int_17.xsm
+load --module 0 ../nespl/spl_progs/module_0.xsm
+load --module 1 ../nespl/spl_progs/module_1.xsm
+load --module 2 ../nespl/spl_progs/module_2.xsm
+load --module 3 ../nespl/spl_progs/module_3.xsm
+load --module 4 ../nespl/spl_progs/module_4.xsm
+load --module 5 ../nespl/spl_progs/module_5.xsm
+load --module 6 ../nespl/spl_progs/module_6.xsm
+load --module 7 ../nespl/spl_progs/module_7.xsm
+load --module 8 ../nespl/spl_progs/module_8.xsm

@@ -1,0 +1,179 @@
+// Idle Code
+loadi(69,11);
+
+//MOD 5 loading
+loadi(50,63);
+loadi(51,64);
+
+//MOD 7 loading
+loadi(54, 67);
+loadi(55, 68);
+
+//Loading secondary bootstrap code
+loadi(128,512);
+
+//MOD 8 loading
+loadi(132,516);
+loadi(133,517);
+
+//Setting SP to kernel stack
+SP = 76*512 - 1;
+
+call BOOT_MODULE;
+
+// First pid is that of idle process
+PTBR = PAGE_TABLE_BASE;
+PTLR = 10;
+
+alias i R6;
+i = 0;
+while(i < 20) do
+	[PTBR + i] = -1;
+	[PTBR + i + 1] = "0000";
+	i = i + 2;
+endwhile;
+
+//library
+[PTBR + 0] = 63;
+[PTBR + 1] = "0100";
+[PTBR + 2] = 64;
+[PTBR + 3] = "0100";
+
+//Code
+[PTBR+8] = 69;
+[PTBR+9] = "0100";
+
+//Stack
+[PTBR+16] = 70;
+[PTBR+17] = "0110";
+
+alias PROC_TAB R0;
+PROC_TAB = PROCESS_TABLE;
+//Process table entry for idle program
+//Tick = 0
+[PROC_TAB] = 0;
+//pid = 0
+[PROC_TAB + 1] = 0;
+//UserID = 0
+[PROC_TAB + 3] = 0;
+//Assigning UArea page number
+[PROC_TAB + 11] = 76;
+//State is RUNNING
+[PROC_TAB + 4] = RUNNING;
+//Setting UPTR to stack logical address
+[PROC_TAB + 13] = 4096;
+//Setting KPTR to 0
+[PROC_TAB + 12] = 0;
+//Setting PTBR
+[PROC_TAB + 14] = PAGE_TABLE_BASE;
+//Setting PTLR
+[PROC_TAB + 15] = 10;
+//Setting entry point IP Value from header to stack top
+[70 * 512] = [69*512 + 1];
+
+// Initializing idle2 process -- pid=14
+PTBR = PAGE_TABLE_BASE + 280;
+PTLR = 10;
+
+i = 0;
+while(i < 20) do
+	[PTBR + i] = -1;
+	[PTBR + i + 1] = "0000";
+	i = i + 2;
+endwhile;
+
+//Code
+[PTBR+8] = 69;
+[PTBR+9] = "0100";
+
+//Stack
+[PTBR+16] = 83;
+[PTBR+17] = "0110";
+
+PROC_TAB = PROCESS_TABLE + 14*16;
+//Process table entry for idle2 program
+//Tick = 0
+[PROC_TAB] = 0;
+//pid = 0
+[PROC_TAB + 1] = 14;
+//UserID = 0
+[PROC_TAB + 3] = 0;
+//Assigning UArea page number
+[PROC_TAB + 11] = 84;
+//State is RUNNING
+[PROC_TAB + 4] = RUNNING;
+//Setting UPTR to stack logical address
+[PROC_TAB + 13] = 4096;
+//Setting KPTR to 0
+[PROC_TAB + 12] = 0;
+//Setting PTBR
+[PROC_TAB + 14] = PTBR;
+//Setting PTLR
+[PROC_TAB + 15] = 10;
+
+
+
+
+//Initializing the Swapper Daemon--pid=15
+PTBR = PAGE_TABLE_BASE + 300;
+PTLR = 10;
+
+
+i = 0;
+while(i < 20) do
+	[PTBR + i] = -1;
+	[PTBR + i + 1] = "0000";
+	i = i + 2;
+endwhile;
+
+//Code
+[PTBR+8] = 69;
+[PTBR+9] = "0100";
+
+//Stack
+[PTBR+16] = 81;
+[PTBR+17] = "0110";
+
+
+PROC_TAB = PROCESS_TABLE + 15*16;
+//Process table entry for swapper daemon program
+//Tick = 0
+[PROC_TAB] = 0;
+//pid = 15
+[PROC_TAB + 1] = 15;
+//UserID = 0
+[PROC_TAB + 3] = 0;
+//Assigning UArea page number
+[PROC_TAB + 11] = 82;
+//State is CREATED
+[PROC_TAB + 4] = CREATED;
+//Setting UPTR to stack logical address
+[PROC_TAB + 13] = 4096;
+//Setting KPTR to 0
+[PROC_TAB + 12] = 0;
+//Setting PTBR
+[PROC_TAB + 14] = PTBR;
+//Setting PTLR
+[PROC_TAB + 15] = 10;
+//Setting entry point IP Value from header to stack top
+[81 * 512] = [69*512 + 1];
+
+//Initializing currentpid2 and logout status
+[SYSTEM_STATUS_TABLE + 6] = 14;
+[SYSTEM_STATUS_TABLE + 7] = 0;
+
+//Initializing access lock table
+[ACCESS_LOCK_TABLE] = 0;
+[ACCESS_LOCK_TABLE + 1]=0;
+
+//Setting machine registers for scheduling idle process
+PTBR = PAGE_TABLE_BASE;
+PTLR = 10;
+
+// Stack pointer to logical address of user stack
+SP = 4096;
+// Setting current process to the pid-0 ie, idle process
+[SYSTEM_STATUS_TABLE + 1] = 0;
+
+start;
+ireturn;

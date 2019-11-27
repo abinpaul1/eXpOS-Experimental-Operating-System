@@ -1,0 +1,25 @@
+// Saving value of SP to UPTR
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + CORE*5 + 1]*16 ) + 13] = SP;
+//Setting SP to beginning of User Area Page
+SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + CORE*5 + 1]*16 ) + 11]*512 - 1;
+backup;
+
+// Setting disk status to free--0
+[DISK_STATUS_TABLE] = 0;
+
+// Setting processes in WAIT_DISK to READY
+alias iter R1;
+iter = 1;
+while (iter<=15) do
+  if ([PROCESS_TABLE + iter*16 + 1] != -1) then
+    if ([PROCESS_TABLE + iter*16 + 4]==WAIT_DISK) then
+      [PROCESS_TABLE +iter*16 + 4] = READY;
+    endif;
+  endif;
+  iter = iter + 1;
+endwhile;
+
+restore;
+SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + CORE*5 + 1]*16 ) + 13];
+
+ireturn;

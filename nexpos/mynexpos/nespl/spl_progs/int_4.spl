@@ -1,0 +1,277 @@
+alias userSP R0;
+userSP = SP;
+
+alias ret_addr R1;
+ret_addr = [PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512;
+
+alias proc_tab_entry R10;
+proc_tab_entry = PROCESS_TABLE + [SYSTEM_STATUS_TABLE + CORE*5 + 1]*16;
+
+// SP value is stored in UPTR field of process table
+[proc_tab_entry + 13] = SP;
+
+// Changing to kernel stack
+SP = [proc_tab_entry + 11]*512 - 1;
+
+//Acquire kernel lock
+backup;
+R1 = 1;
+call MOD_8;
+restore;
+
+//Extracting system call numebr from user stack -- value in userSP-5
+alias sys_call_num R2;
+sys_call_num = [[PTBR + 2*((userSP-5)/512)]*512 + (userSP-5)%512];
+
+alias file_name R3;
+file_name = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+//Create
+if (sys_call_num==1) then
+
+  //Setting mode flag to 1
+  [proc_tab_entry + 9] = 1;
+
+  alias permission R4;
+  permission = [[PTBR + 2*((userSP-3)/512)]*512 + (userSP-3)%512];
+
+  alias iter R5;
+
+  iter = 0;
+  //Checking if file is already present in the system
+  while(iter<MAX_FILE_NUM) do
+    if ( [INODE_TABLE + iter*16] == DATA) then
+      if ( [INODE_TABLE + iter*16 + 1] == file_name) then
+        //Storing return value in stack
+        [ret_addr] = 0;
+        //Release kernel lock
+        backup;
+        R1 = 4;
+        R2 = KERN_LOCK;
+        call MOD_8;
+        restore;
+        SP = userSP;
+        //Mode field reset to 0
+        [proc_tab_entry + 9] = 0;
+        ireturn;
+      endif;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  iter = 0;
+
+  //Checking for free entry
+  while(iter<MAX_FILE_NUM) do
+    if ([INODE_TABLE + iter*16 + 1] == -1) then
+      break;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  //If no free entry is found
+  if (iter==MAX_FILE_NUM) then
+    //Storing return value in stack
+    [ret_addr] = -1;
+    //Release kernel lock
+    backup;
+    R1 = 4;
+    R2 = KERN_LOCK;
+    call MOD_8;
+    restore;
+    SP = userSP;
+    //Mode field reset to 0
+    [proc_tab_entry + 9] = 0;
+    ireturn;
+  endif;
+
+  alias free_entry R6;
+  free_entry = iter;
+
+  alias inode_table_addr R7;
+  inode_table_addr = INODE_TABLE + free_entry*16;
+
+  //Setting entry values
+  [inode_table_addr] = DATA;
+  [inode_table_addr + 1] = file_name;
+  //Setting file size to 0
+  [inode_table_addr + 2] = 0;
+  //Setting user id
+  [inode_table_addr + 3] = [proc_tab_entry + 3];
+  [inode_table_addr + 4] = permission;
+
+  //Setting block numbers to -1
+  [inode_table_addr + 8] = -1;
+  [inode_table_addr + 9] = -1;
+  [inode_table_addr + 10] = -1;
+  [inode_table_addr + 11] = -1;
+
+  //Setting root file entries
+
+  [ROOT_FILE + free_entry*8] = file_name;
+  //Setting file size to 0
+  [ROOT_FILE + free_entry*8 + 1] = 0;
+  [ROOT_FILE + free_entry*8 + 2] = DATA;
+  //Setting user id
+  [ROOT_FILE + free_entry*8 + 3] = [USER_TABLE + (2 * [proc_tab_entry + 3])];
+  [ROOT_FILE + free_entry*8 + 4] = permission;
+endif;
+
+//Delete
+if (sys_call_num == 4) then
+  //Setting mode flag to 1
+  [proc_tab_entry + 9] = 4;
+
+  alias iter R4;
+  iter = 0;
+
+  alias inode_index R5;
+  //Checking for file in the inode table
+  while(iter<MAX_FILE_NUM) do
+    if ( [INODE_TABLE + iter*16 + 1] == file_name) then
+      break;
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  inode_index = iter;
+
+  alias inode_addr R6;
+  inode_addr = INODE_TABLE + inode_index*16;
+
+  //If file is not present in inode table
+  if (iter==MAX_FILE_NUM) then
+    //Storing return value in stack
+    [ret_addr] = 0;
+    //Release kernel lock
+    backup;
+    R1 = 4;
+    R2 = KERN_LOCK;
+    call MOD_8;
+    restore;
+    SP = userSP;
+    //Mode field reset to 0
+    [proc_tab_entry + 9] = 0;
+    ireturn;
+  endif;
+
+  alias check R9;
+  check = 0;
+  //If file type is not data
+  if ([inode_addr] != DATA) then
+    check = 1;
+  endif;
+
+  //If permission is set as exclusive
+  if ([inode_addr + 4] == EXCLUSIVE) then
+    // If current user is not root and does not own the file
+    alias user_id R12;
+    user_id = [proc_tab_entry + 3];
+    if ( (user_id != 1) && ([inode_addr + 3] != user_id) ) then
+      check = 1;
+    endif;
+  endif;
+
+  if (check == 1) then
+    //Storing return value in stack
+    [ret_addr] = -1;
+    //Release kernel lock
+    backup;
+    R1 = 4;
+    R2 = KERN_LOCK;
+    call MOD_8;
+    restore;
+    SP = userSP;
+    //Mode field reset to 0
+    [proc_tab_entry + 9] = 0;
+    ireturn;
+  endif;
+
+  //Acquiring inode
+  multipush(R0,R1,R2,R3,R5,R6,R10);
+  R1 = 4;
+  R2 = [SYSTEM_STATUS_TABLE + CORE*5 + 1];
+  R3 = inode_index;
+  call MOD_0;
+  multipop(R0,R1,R2,R3,R5,R6,R10);
+
+  //If file is open
+  if ([FILE_STATUS_TABLE + inode_index*4 + 1] != -1) then
+    //Releasing the inode lock
+		backup;
+		R1 = 5;
+		R2 = [SYSTEM_STATUS_TABLE+1];
+		R3 = inode_index;
+		call MOD_0;
+		restore;
+
+    //Storing return value in stack
+    [ret_addr] = -2;
+    //Release kernel lock
+    backup;
+    R1 = 4;
+    R2 = KERN_LOCK;
+    call MOD_8;
+    restore;
+
+    SP = userSP;
+    //Mode field reset to 0
+    [proc_tab_entry + 9] = 0;
+    ireturn;
+  endif;
+
+  iter = 8;
+  while(iter<12) do
+    alias disk_blockNum R7;
+    disk_blockNum = [inode_addr + iter];
+    if ( disk_blockNum != -1) then
+      alias buffer_block_num R8;
+      buffer_block_num = disk_blockNum % 4;
+
+      alias buffer_tab_ind R9;
+      buffer_tab_ind = BUFFER_TABLE + buffer_block_num*4;
+      //Resetting dirty bit of buffer block if it is set
+      if ( [buffer_tab_ind+1] != 0 && [buffer_tab_ind] == disk_blockNum) then
+        [buffer_tab_ind+1] = 0;
+      endif;
+
+      //Releasing the block
+      multipush(R0,R1,R2,R3,R4,R5,R6,R7,R8,R10);
+      R1 = 4;
+      R2 = disk_blockNum;
+      R3 = [SYSTEM_STATUS_TABLE + CORE*5 + 1];
+      call MOD_2;
+      multipop(R0,R1,R2,R3,R4,R5,R6,R7,R8,R10);
+    endif;
+    iter = iter + 1;
+  endwhile;
+
+  //Invalidating inode table of the file
+  [inode_addr + 1] = -1;
+
+  //Updating root file
+  [ROOT_FILE + inode_index*8] = -1;
+
+  //Release inode
+  multipush(R0,R1,R2,R3,R5,R10);
+  R1 = 5;
+  R2 = [SYSTEM_STATUS_TABLE + CORE*5 + 1];
+  R3 = inode_index;
+  call MOD_0;
+  multipop(R0,R1,R2,R3,R5,R10);
+endif;
+
+//Storing return value in stack
+[ret_addr] = 0;
+//Release kernel lock
+backup;
+R1 = 4;
+R2 = KERN_LOCK;
+call MOD_8;
+restore;
+
+SP = userSP;
+//Mode field reset to 0
+[proc_tab_entry + 9] = 0;
+
+ireturn;
